@@ -1,16 +1,23 @@
 import PressTip from 'app/dim-ui/PressTip';
 import { t } from 'app/i18next-t';
 import { itemNoteSelector } from 'app/inventory/dim-item-info';
+import ItemPopupTrigger from 'app/inventory/ItemPopupTrigger';
+import { moveItemTo } from 'app/inventory/move-item';
+import { currentStoreSelector } from 'app/inventory/selectors';
+import ActionButton from 'app/item-actions/ActionButton';
 import { LockActionButton, TagActionButton } from 'app/item-actions/ActionButtons';
+import { useThunkDispatch } from 'app/store/thunk-dispatch';
+import { useSetCSSVarToHeight } from 'app/utils/hooks';
 import clsx from 'clsx';
-import React from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import ConnectedInventoryItem from '../inventory/ConnectedInventoryItem';
 import { DimItem, DimPlug, DimSocket } from '../inventory/item-types';
 import ItemSockets from '../item-popup/ItemSockets';
 import ItemTalentGrid from '../item-popup/ItemTalentGrid';
-import { AppIcon, searchIcon } from '../shell/icons';
+import { AppIcon, faArrowCircleDown, searchIcon } from '../shell/icons';
 import { StatInfo } from './Compare';
+import styles from './CompareItem.m.scss';
 import CompareStat from './CompareStat';
 import { DimAdjustedItemPlug, DimAdjustedItemStat } from './types';
 
@@ -20,7 +27,6 @@ export default function CompareItem({
   compareBaseStats,
   itemClick,
   remove,
-  highlight,
   setHighlight,
   updateSocketComparePlug,
   adjustedItemPlugs,
@@ -30,7 +36,6 @@ export default function CompareItem({
   item: DimItem;
   stats: StatInfo[];
   compareBaseStats?: boolean;
-  highlight: number | string | undefined;
   itemClick(item: DimItem): void;
   remove(item: DimItem): void;
   setHighlight(value?: string | number): void;
@@ -39,35 +44,56 @@ export default function CompareItem({
   adjustedItemStats?: DimAdjustedItemStat;
   isInitialItem: boolean;
 }) {
+  const headerRef = useRef<HTMLDivElement>(null);
+  useSetCSSVarToHeight(headerRef, '--compare-item-height');
   const itemNotes = useSelector(itemNoteSelector(item));
+  const dispatch = useThunkDispatch();
+  const currentStore = useSelector(currentStoreSelector)!;
+  const pullItem = useCallback(() => {
+    dispatch(moveItemTo(item, currentStore, false));
+  }, [currentStore, dispatch, item]);
+
+  const itemHeader = useMemo(
+    () => (
+      <div ref={headerRef}>
+        <div className={styles.header}>
+          <ActionButton title={t('Hotkey.Pull')} onClick={pullItem}>
+            <AppIcon icon={faArrowCircleDown} />
+          </ActionButton>
+          <LockActionButton item={item} />
+          <TagActionButton item={item} label={false} hideKeys={true} />
+          <div className={styles.close} onClick={() => remove(item)} role="button" tabIndex={0} />
+        </div>
+        <div
+          className={clsx(styles.itemName, { [styles.initialItem]: isInitialItem })}
+          title={isInitialItem ? t('Compare.InitialItem') : undefined}
+          onClick={() => itemClick(item)}
+        >
+          {item.name} <AppIcon icon={searchIcon} />
+        </div>
+        <ItemPopupTrigger item={item} noCompare={true}>
+          {(ref, onClick) => (
+            <div className={styles.itemAside} ref={ref} onClick={onClick}>
+              <PressTip className={styles.itemAside} tooltip={itemNotes} allowClickThrough={true}>
+                <ConnectedInventoryItem item={item} />
+              </PressTip>
+            </div>
+          )}
+        </ItemPopupTrigger>
+      </div>
+    ),
+    [isInitialItem, item, itemClick, pullItem, remove, itemNotes]
+  );
+
   return (
     <div className="compare-item">
-      <div className="compare-item-header">
-        <LockActionButton item={item} />
-        <TagActionButton item={item} label={true} hideKeys={true} />
-        <div className="close" onClick={() => remove(item)} />
-      </div>
-      <div
-        className={clsx('item-name', { 'compare-initial-item': isInitialItem })}
-        onClick={() => itemClick(item)}
-      >
-        {item.name} <AppIcon icon={searchIcon} />
-      </div>
-      <PressTip
-        elementType="span"
-        className="itemAside"
-        tooltip={itemNotes}
-        allowClickThrough={true}
-      >
-        <ConnectedInventoryItem item={item} onClick={() => itemClick(item)} />
-      </PressTip>
+      {itemHeader}
       {stats.map((stat) => (
         <CompareStat
           key={stat.id}
           item={item}
           stat={stat}
           setHighlight={setHighlight}
-          highlight={highlight}
           adjustedItemStats={adjustedItemStats}
           compareBaseStats={compareBaseStats}
         />

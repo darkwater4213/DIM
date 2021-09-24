@@ -1,27 +1,25 @@
 import ElementIcon from 'app/dim-ui/ElementIcon';
 import { t } from 'app/i18next-t';
 import RecoilStat from 'app/item-popup/RecoilStat';
-import clsx from 'clsx';
 import { StatHashes } from 'data/d2/generated-enums';
 import React from 'react';
 import { D1Stat, DimItem } from '../inventory/item-types';
 import { getColor } from '../shell/filters';
 import { AppIcon, starIcon } from '../shell/icons';
 import { MinimalStat, StatInfo } from './Compare';
+import styles from './CompareStat.m.scss';
 import { DimAdjustedItemStat } from './types';
 
 export default function CompareStat({
   stat,
   compareBaseStats,
   item,
-  highlight,
   setHighlight,
   adjustedItemStats,
 }: {
   stat: StatInfo;
   compareBaseStats?: boolean;
   item: DimItem;
-  highlight?: number | string | undefined;
   setHighlight?(value?: string | number): void;
   adjustedItemStats?: DimAdjustedItemStat;
 }) {
@@ -30,7 +28,6 @@ export default function CompareStat({
 
   return (
     <div
-      className={clsx({ highlight: stat.id === highlight })}
       onMouseOver={() => setHighlight?.(stat.id)}
       style={getColor(statRange(itemStat, stat, compareBaseStats, adjustedStatValue), 'color')}
     >
@@ -41,7 +38,7 @@ export default function CompareStat({
         )}
         {itemStat?.value !== undefined ? (
           itemStat.statHash === StatHashes.RecoilDirection ? (
-            <span className="stat-recoil">
+            <span className={styles.recoil}>
               <span>{adjustedItemStats?.[itemStat.statHash] ?? itemStat.value}</span>
               <RecoilStat value={adjustedItemStats?.[itemStat.statHash] ?? itemStat.value} />
             </span>
@@ -56,7 +53,7 @@ export default function CompareStat({
         {Boolean(itemStat?.value) &&
           (itemStat as D1Stat).qualityPercentage &&
           Boolean((itemStat as D1Stat).qualityPercentage!.range) && (
-            <span className="range">({(itemStat as D1Stat).qualityPercentage!.range})</span>
+            <span className={styles.range}>({(itemStat as D1Stat).qualityPercentage!.range})</span>
           )}
       </span>
     </div>

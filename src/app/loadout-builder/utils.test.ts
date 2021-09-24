@@ -1,12 +1,9 @@
+import { UpgradeSpendTier } from '@destinyitemmanager/dim-api-types';
 import { D2ManifestDefinitions } from 'app/destiny2/d2-definitions';
 import { DimItem } from 'app/inventory/item-types';
 import 'cross-fetch/polyfill';
 import { getTestDefinitions, getTestStores } from '../../testing/test-utils';
-import {
-  canSwapEnergyFromUpgradeSpendTier,
-  UpgradeSpendTier,
-  upgradeSpendTierToMaxEnergy,
-} from './utils';
+import { canSwapEnergyFromUpgradeSpendTier, upgradeSpendTierToMaxEnergy } from './utils';
 
 describe('Spend tier tests', () => {
   let defs: D2ManifestDefinitions;
@@ -45,7 +42,6 @@ describe('Spend tier tests', () => {
 
   test.each([
     ['AscendantShards', true],
-    ['AscendantShardsLockEnergyType', false],
     ['AscendantShardsNotMasterworked', false],
     ['AscendantShardsNotExotic', true],
     ['EnhancementPrisms', false],
@@ -55,15 +51,14 @@ describe('Spend tier tests', () => {
     'Upgrade spend tier %s can swap energy on a masterworked item = %p',
     (tier: string, result: boolean) => {
       const updatedItem: DimItem = { ...item, energy: { ...item.energy!, energyCapacity: 10 } };
-      expect(canSwapEnergyFromUpgradeSpendTier(defs, UpgradeSpendTier[tier], updatedItem)).toBe(
-        result
-      );
+      expect(
+        canSwapEnergyFromUpgradeSpendTier(defs, UpgradeSpendTier[tier], updatedItem, false)
+      ).toBe(result);
     }
   );
 
   test.each([
     ['AscendantShards', true],
-    ['AscendantShardsLockEnergyType', false],
     ['AscendantShardsNotMasterworked', false],
     ['AscendantShardsNotExotic', false],
     ['EnhancementPrisms', false],
@@ -76,15 +71,15 @@ describe('Spend tier tests', () => {
         ...exoticItem,
         energy: { ...exoticItem.energy!, energyCapacity: 10 },
       };
-      expect(canSwapEnergyFromUpgradeSpendTier(defs, UpgradeSpendTier[tier], updatedItem)).toBe(
-        result
-      );
+      expect(
+        canSwapEnergyFromUpgradeSpendTier(defs, UpgradeSpendTier[tier], updatedItem, false)
+      ).toBe(result);
     }
   );
 
   test.each([
     ['AscendantShards', true],
-    ['AscendantShardsLockEnergyType', false],
+
     ['AscendantShardsNotMasterworked', true],
     ['AscendantShardsNotExotic', true],
     ['EnhancementPrisms', true],
@@ -94,15 +89,14 @@ describe('Spend tier tests', () => {
     'Upgrade spend tier %s can swap energy on an item with 9 energy = %p',
     (tier: string, result: boolean) => {
       const updatedItem: DimItem = { ...item, energy: { ...item.energy!, energyCapacity: 9 } };
-      expect(canSwapEnergyFromUpgradeSpendTier(defs, UpgradeSpendTier[tier], updatedItem)).toBe(
-        result
-      );
+      expect(
+        canSwapEnergyFromUpgradeSpendTier(defs, UpgradeSpendTier[tier], updatedItem, false)
+      ).toBe(result);
     }
   );
 
   test.each([
     ['AscendantShards', true],
-    ['AscendantShardsLockEnergyType', false],
     ['AscendantShardsNotMasterworked', true],
     ['AscendantShardsNotExotic', true],
     ['EnhancementPrisms', true],
@@ -112,15 +106,14 @@ describe('Spend tier tests', () => {
     'Upgrade spend tier %s can swap energy on an item with 7 energy = %p',
     (tier: string, result: boolean) => {
       const updatedItem: DimItem = { ...item, energy: { ...item.energy!, energyCapacity: 7 } };
-      expect(canSwapEnergyFromUpgradeSpendTier(defs, UpgradeSpendTier[tier], updatedItem)).toBe(
-        result
-      );
+      expect(
+        canSwapEnergyFromUpgradeSpendTier(defs, UpgradeSpendTier[tier], updatedItem, false)
+      ).toBe(result);
     }
   );
 
   test.each([
     ['AscendantShards', 10],
-    ['AscendantShardsLockEnergyType', 10],
     ['AscendantShardsNotMasterworked', 10],
     ['AscendantShardsNotExotic', 10],
     ['EnhancementPrisms', 10],
@@ -136,7 +129,6 @@ describe('Spend tier tests', () => {
 
   test.each([
     ['AscendantShards', 10],
-    ['AscendantShardsLockEnergyType', 10],
     ['AscendantShardsNotMasterworked', 10],
     ['AscendantShardsNotExotic', 10],
     ['EnhancementPrisms', 10],
@@ -155,7 +147,6 @@ describe('Spend tier tests', () => {
 
   test.each([
     ['AscendantShards', 10],
-    ['AscendantShardsLockEnergyType', 10],
     ['AscendantShardsNotMasterworked', 10],
     ['AscendantShardsNotExotic', 10],
     ['EnhancementPrisms', 9],
@@ -171,7 +162,6 @@ describe('Spend tier tests', () => {
 
   test.each([
     ['AscendantShards', 10],
-    ['AscendantShardsLockEnergyType', 10],
     ['AscendantShardsNotMasterworked', 10],
     ['AscendantShardsNotExotic', 9],
     ['EnhancementPrisms', 9],
@@ -190,7 +180,6 @@ describe('Spend tier tests', () => {
 
   test.each([
     ['AscendantShards', 10],
-    ['AscendantShardsLockEnergyType', 10],
     ['AscendantShardsNotMasterworked', 10],
     ['AscendantShardsNotExotic', 10],
     ['EnhancementPrisms', 9],
@@ -206,7 +195,6 @@ describe('Spend tier tests', () => {
 
   test.each([
     ['AscendantShards', 10],
-    ['AscendantShardsLockEnergyType', 10],
     ['AscendantShardsNotMasterworked', 10],
     ['AscendantShardsNotExotic', 10],
     ['EnhancementPrisms', 9],

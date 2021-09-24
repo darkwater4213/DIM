@@ -1,5 +1,6 @@
 module.exports = function (api) {
   const isProduction = api.env('production');
+  const isTest = api.env('test');
   const plugins = [
     'lodash',
     'babel-plugin-optimize-clsx',
@@ -9,7 +10,7 @@ module.exports = function (api) {
     [
       '@babel/plugin-transform-runtime',
       {
-        useESModules: true,
+        useESModules: !isTest,
       },
     ],
     [
@@ -40,34 +41,35 @@ module.exports = function (api) {
       '@babel/plugin-transform-react-inline-elements'
     );
   } else {
+    if (!isTest) {
+      plugins.push('react-refresh/babel');
+    }
+
     // In dev, compile TS with babel
     plugins.push(
-      'react-refresh/babel',
       ['@babel/proposal-class-properties', { loose: true }],
       '@babel/proposal-object-rest-spread',
-      [
-        'const-enum',
-        {
-          transform: 'constObject',
-        },
-      ],
-      ['@babel/plugin-transform-typescript', { isTSX: true }]
+      ['@babel/plugin-transform-typescript', { isTSX: true, optimizeConstEnums: true }]
     );
+  }
+
+  const presetEnvOptions = {
+    bugfixes: true,
+    modules: false,
+    loose: true,
+    useBuiltIns: 'usage',
+    corejs: 3,
+    shippedProposals: true,
+  };
+
+  if (isTest) {
+    presetEnvOptions.targets = { node: 'current' };
+    presetEnvOptions.modules = 'auto';
   }
 
   return {
     presets: [
-      [
-        '@babel/preset-env',
-        {
-          bugfixes: true,
-          modules: false,
-          loose: true,
-          useBuiltIns: 'usage',
-          corejs: 3,
-          shippedProposals: true,
-        },
-      ],
+      ['@babel/preset-env', presetEnvOptions],
       ['@babel/preset-react', { useBuiltIns: true, loose: true, corejs: 3 }],
     ],
     plugins,

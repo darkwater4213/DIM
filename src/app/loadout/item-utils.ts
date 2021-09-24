@@ -1,13 +1,15 @@
 import { DimItem } from 'app/inventory/item-types';
-import { armorStatHashes } from './known-values';
+import { armorStats } from 'app/search/d2-known-values';
+import { isSunset } from 'app/utils/item-utils';
 
-/** Checks if the item is Armor 2.0 and whether it has stats present for all 6 armor stats. */
-export function isArmor2WithStats(item: DimItem) {
-  return (
+/** Checks if the item is non-sunset Armor 2.0 and whether it has stats present for all 6 armor stats. */
+export function isLoadoutBuilderItem(item: DimItem) {
+  return Boolean(
     item.bucket.inArmor &&
-    item.energy &&
-    armorStatHashes.every((statHash) =>
-      item.stats?.some((dimStat) => dimStat.statHash === statHash)
-    )
+      item.energy &&
+      armorStats.every((statHash) =>
+        item.stats?.some((dimStat) => dimStat.statHash === statHash)
+      ) &&
+      !isSunset(item)
   );
 }

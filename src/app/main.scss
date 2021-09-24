@@ -109,6 +109,8 @@ span:focus {
     visibility: hidden;
   }
 }
+
+// Styles for the warning saying DIM isn't compatible with your browser. Once this CSS loads the warning will fade out after some time.
 #browser-warning {
   position: fixed;
   bottom: 0;
@@ -135,22 +137,6 @@ span:focus {
 // Use this to make images not tappable (Android Chrome will show a download menu)
 .no-pointer-events {
   pointer-events: none;
-}
-
-.currency img {
-  vertical-align: text-bottom;
-  height: 16px;
-  width: 16px;
-}
-
-dt {
-  font-style: italic;
-  font-weight: bold;
-  margin-top: 8px;
-}
-
-dd {
-  margin: 3px 20px;
 }
 
 a {
@@ -222,63 +208,21 @@ h4 {
   font-weight: 400;
 }
 
-.drag-enter {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.drag-hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-.close {
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-  position: absolute;
-  top: 2px;
-  right: calc(2px + var(--item-margin));
-  background-image: url('../images/close.png');
-  background-size: 16px 16px;
-  background-color: rgba(100, 100, 100, 0.8);
-  &:hover {
-    background-color: rgba(0, 0, 0, 1);
-  }
-}
-
 .disabled {
   opacity: 0.5;
 }
 
-.support h2 {
-  margin-top: 1em;
-  margin-bottom: 0.25em;
-}
-
-.fineprint {
-  font-size: 0.85em;
-  color: #aaa;
-}
-
-.overflow-dots {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  &:hover {
-    overflow: visible;
-  }
-}
-
-.stylizedAnchor {
-  text-decoration: none;
-}
-
-.warning-block {
-  color: white;
-  background: $red;
-  padding: 0.5em 1em;
-  display: inline-block;
-}
-
 /* Forms */
+
+input,
+select,
+option {
+  font-family: 'Open Sans', sans-serif;
+}
+
+input[type='search'] {
+  -webkit-appearance: textfield;
+}
 
 textarea {
   width: 100%;
@@ -289,13 +233,6 @@ textarea {
   outline: none;
   color: white;
   box-sizing: border-box;
-}
-textarea.textarea-error {
-  margin: 5px 10px;
-  white-space: pre-wrap;
-  color: #cc6666;
-  width: 100%;
-  text-align: right;
 }
 
 select {

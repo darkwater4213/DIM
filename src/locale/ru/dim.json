@@ -21,7 +21,7 @@
     "ChangeFilter": "Фильтры",
     "Farming": "Предметы",
     "FarmingStart": "Режим Фарма",
-    "FarmingStop": "Stop Farming",
+    "FarmingStop": "Остановка Фарма",
     "Loading": "Текущая Активность",
     "NoQuests": "Задания не отслеживаются",
     "NoSearches": "Сохраняйте запросы поиска и фильтруйте их.",
@@ -35,6 +35,16 @@
     "Nightfall": "Сумрачный налёт",
     "Normal": "Нормальный",
     "WeeklyHeroic": "Недельный Героический Налёт"
+  },
+  "Armory": {
+    "NoNotes": "No Notes",
+    "Season": "Season {{season}}, Year {{year}}",
+    "TrashlistedRolls": "Trashlisted Roll",
+    "TrashlistedRolls_plural": "{{count, number}} Trashlisted Rolls",
+    "Unknown": "Unknown Item",
+    "WishlistedRolls": "Wishlisted Roll",
+    "WishlistedRolls_plural": "{{count, number}} Wishlisted Rolls",
+    "YourItems": "Your Items"
   },
   "Bucket": {
     "Armor": "Броня",
@@ -52,7 +62,7 @@
     "Title": "Сообщение от Bungie:"
   },
   "BungieService": {
-    "AppNotPermitted": "DIM does not have permission to perform this action.",
+    "AppNotPermitted": "DIM не имеет разрешения на выполнение этого действия.",
     "DestinyLegacyPlatform": "Сервисы Bungie содержат баг, который препятствует DIM загрузить информацию вашего аккаунта в Destiny 2, если вы играли в Destiny 1 на консоли прошлого поколения. Bungie скоро это исправят, но до тех пор вы должны играть в Destiny 1 на консоли текущего поколения, чтобы иметь доступ к своим данным.",
     "DevVersion": "Вы используете версию DIM для разработчиков? Вы должны зарегистрироваться в расширении для браузера Chrome через Bungie.Net.",
     "Difficulties": "Bungie.net сейчас испытывает некоторые трудности при использовании.",
@@ -61,7 +71,7 @@
     "ItemUniquenessExplanation_female": "Вы попытались переместить '{{name}}' {{type}} на {{character}}, но это целевое назначение уже содержит такой предмет и может содержать только один.",
     "ItemUniquenessExplanation_male": "Вы попытались переместить '{{name}}' {{type}} на {{character}}, но это целевое назначение уже содержит такой предмет и может содержать только один.",
     "Maintenance": "Сервера Bungie.net отключены для техобслуживания.",
-    "MissingInventory": "Bungie.net did not return your inventory, possibly because your privacy settings prevent it. Try logging out and logging back in.",
+    "MissingInventory": "Bungie.net не дал разрешения загрузить ваш инвентарь, возможно, потому что ваши настройки конфиденциальности препятствуют этому. Попробуйте выйти из аккаунта и снова войти в него.",
     "NetworkError": "Сетевая ошибка - {{status}} {{statusText}}",
     "NoAccount": "Аккаунт Destiny не найден. Вы выбрали правильную платформу?",
     "NoAccountForPlatform": "Не удалось найти ваш аккаунт Destiny на {{platform}}.",
@@ -83,8 +93,10 @@
     "ButtonHelp": "Сравнить предметы",
     "CompareBaseStats": "Показать Базовые характеристики",
     "Error": {
-      "Unmatched": "This item doesn't match the type of items being compared."
-    }
+      "Unmatched": "Этот предмет не соответствует выбранным критериям сравниваемых предметов."
+    },
+    "InitialItem": "This is the item the Compare tool was launched from",
+    "SwipeAdvice": "Прокрутка двумя пальцами"
   },
   "Cooldown": {
     "Grenade": "Перезарядка гранаты: {{cooldown}}",
@@ -113,7 +125,7 @@
     "Title": "Что-то пошло не так"
   },
   "ErrorPanel": {
-    "Description": "This is likely an issue that affects all third-party apps. Check to see if Bungie.net loads, or the Destiny 2 Companion App works.",
+    "Description": "Скорее всего, это проблема, которая затрагивает все сторонние приложения. Проверьте, загружается ли Bungie.net или приложение-компаньон Destiny 2.",
     "Troubleshooting": "Устранение неполадок"
   },
   "FarmingMode": {
@@ -131,7 +143,7 @@
       "MakeRoom": "Освобождать место для лута путём перемещения снаряжения",
       "Tooltip": "Если включено, DIM переместит оружие и броню, чтобы освободить место в Хранилище для Энграмм."
     },
-    "OutOfRoom": "You're out of space to move items off of {{character}}. Time to clear out the trash!",
+    "OutOfRoom": "Не хватает свободного места, чтобы переместить предметы с {{character}}. Самое время дешифровать несколько Энграмм и почистить всё от мусора!",
     "OutOfRoomTitle": "Недостаточно свободного места",
     "Stop": "Остановить"
   },
@@ -156,6 +168,7 @@
     "ContributePower": "Увеличивающие уровень Силы.",
     "Cosmetic": "Косметика.",
     "Curated": "Год-роллы.",
+    "CurrentClass": "Показывает предметы, которые могут быть экипированы текущим стражем.",
     "DamageType": "По типу стихии.",
     "Description": "Описание",
     "Dupe": "Одинаковые, Включая перевыпуски разных сезонов",
@@ -206,6 +219,7 @@
     "PerkName": "С бонусом или модификатором содержащим введенный после фильтра текст Только В Названии. Для поиска словосочетаний и фраз - заключите 'текст в кавычки'.",
     "PinnacleReward": "Испытания со Сверхмощными наградами.",
     "Postmaster": "У Почтмейстера.",
+    "PowerKeywords": "Use the pinnaclecap or softcap keyword instead of a number to refer to the current season's power limits.",
     "PowerLevel": "Shows items based on their power level. $t(Filter.PowerKeywords)",
     "PowerLimit": "Shows items based on the maximum power level they can be infused to. $t(Filter.PowerKeywords)",
     "PowerfulReward": "(!) Временно сломан.",
@@ -228,6 +242,7 @@
       "Tag": "С указанным Тэгом.",
       "Tagged": "С любым Тэгом."
     },
+    "Timelost": "\\(вневременн(ой|ая)\\)",
     "Tracked": "Контракты/Преследования по статусу отслеживания.",
     "Transferable": "Перемещаемые.",
     "Trashlist": "\"Мусор\" по загруженному Wish List.",
@@ -301,14 +316,14 @@
     "Vault": "Отправить в Хранилище"
   },
   "Infusion": {
-    "Filter": "Поиск/Фильтр",
-    "InfuseSource": "Выберите что улучшить за счёт {{name}}",
-    "InfuseTarget": "Выберите чем пожертвовать для улучшения {{name}}",
-    "InfusionMaterials": "Материалы для Синтеза",
-    "NoItems": "Нет предметов для синтеза.",
-    "NoTransfer": "Перемещение расходников синтеза\n {{target}} не удается переместить.",
-    "SwitchDirection": "Наоборот",
-    "TransferItems": "Передать"
+    "Filter": "Filter items",
+    "InfuseSource": "Select item to infuse {{name}} into",
+    "InfuseTarget": "Select item to infuse into {{name}}",
+    "InfusionMaterials": "Infusion Materials",
+    "NoItems": "No infusable items available.",
+    "NoTransfer": "Transfer infusion material\n {{target}} cannot be moved.",
+    "SwitchDirection": "Switch",
+    "TransferItems": "Transfer"
   },
   "ItemMove": {
     "Consolidate": "Собрали {{name}}",
@@ -414,49 +429,47 @@
   },
   "LoadoutBuilder": {
     "AddHalfTierMods": "Добавить +5 Модификаторы",
-    "AscendantShardDetails": "For all items, the Optimizer will assume masterwork stat bonuses and energy level, and may swap element as needed to assign mods.",
-    "AscendantShardLockEnergyDetails": "For all items, the Optimizer will assume masterworked stat bonuses and energy level. All items will use their existing element.\n\nThis is the equivalent of the old Assume Masterwork setting.",
-    "AscendantShardNotExoticDetails": "For Legendary items, the Optimizer will assume masterwork stat bonuses and energy level, and may swap element as needed to assign mods.\n\nFor Exotic items at {{energyLevel}} or below, the Optimizer will assume {{energyLevel}} energy and will swap element as needed to assign mods. Exotics will use their current stats.\n\nCurrently masterworked Legendary items and Exotics above {{energyLevel}} energy will use their existing element.",
-    "AscendantShardNotMasterworkedDetails": "For all items, the Optimizer will assume masterworked stat bonuses and energy level, and may swap element as needed to assign mods.\n\nCurrently masterworked items will use their existing element.",
+    "AscendantShardDetails": "For all items, the Optimizer will assume masterwork stat bonuses and energy level. {{elementLockDescription}}",
+    "AscendantShardNotExoticDetails": "For Legendary items, the Optimizer will assume masterwork stat bonuses and energy level. {{elementLockDescription}}\n\nFor Exotic items at {{energyLevel}} or below, the Optimizer will assume {{energyLevel}} energy and will swap element as needed to assign mods. Exotics will use their current stats.\n\nCurrently masterworked Legendary items and Exotics above {{energyLevel}} energy will use their existing element.",
+    "AscendantShardNotMasterworkedDetails": "For all items, the Optimizer will assume masterworked stat bonuses and energy level. {{elementLockDescription}}\n\nCurrently masterworked items will use their existing element.",
     "ChooseAlternate": "Предметы с такими же характеристиками:",
     "ChooseAlternateTitle": "Заменить",
     "CompareLoadout": "Сравнить Наборы",
     "ConfirmOverwrite": "Выбранные предметы заменят аналоги в Наборе \"{{name}}\". Продолжаем? ",
+    "CopiedBuild": "Copied build settings URL to clipboard",
     "CreateLoadout": "Сохранить Набор",
+    "ElementLockedDescription": "Items will use their existing element.",
+    "ElementNotLockedDescription": "Items will change element as needed to assign mods.",
     "EquipItems": "Надеть",
     "ExcludeItem": "Игнорируемые предметы",
     "ExistingLoadout": "Существующий Набор",
     "Filter": "Фильтр",
-    "GeneratedBuilds": "Наборы",
-    "LegendaryShardsAndEnhancementPrismDetails": "All items' current stats will be used. For items at {{energyLevel}} energy or below, the Optimizer will assume {{energyLevel}} energy, and will change element as needed to assign mods.\n\nItems above {{energyLevel}} energy will use their existing energy level and element.",
-    "LimitedCombos": "You have {{combosWithoutCaps, number}} possible armor combinations, but DIM only looked at the {{combos, number}} highest stat combos to keep your browser from crashing. Select some perks, use a search, or dismantle old armor to reduce the number of combos. Pinning general or seasonal mods increases the number of combos.",
-    "LockElement": "{{material}} (Lock Element)",
+    "LegendaryShardsAndEnhancementPrismDetails": "All items' current stats will be used. For items at {{energyLevel}} energy or below, the Optimizer will assume {{energyLevel}} energy. {{elementLockDescription}}\n\nItems above {{energyLevel}} energy will use their existing energy level and element.",
+    "LockElement": "Lock Element",
     "LockEquipped": "Надетые",
     "LockItem": "Обязательные Предметы",
     "NewEmptyLoadout": "Новый Набор",
-    "NoBuildsFoundExoticsAndMods": "Выбраны Обязательные Бонус и Пять сезонных Модификаторов.",
-    "NoBuildsFoundModsAreTooExpensive": "Модификаторы требуют слишком много Энергии.",
-    "NoBuildsFoundSeasonalModNotSatisfied": "Не найден предмет с ячейкой для одного из Обязательных сезонных Модификаторов.",
-    "NoBuildsFoundWithReasons": "Билды не найдены. Возможные причины:",
+    "NoBuildsFoundWithReasons": "No builds found. This is typically because DIM could not assign all selected mods to any armor set.",
     "NoComparableItems": "This loadout has no comparable items. Saving the Optimizer Set will add the items to this loadout.",
     "NoLoadoutsToCompare": "Нет Наборов для сравнения",
     "NoUpgrades": "No Upgrades",
     "NoUpgradesDetails": "The current stats, energy level, and element of your items will be used when determining totals and assigning mods.",
     "NotExotics": "{{material}} (Not Exotics)",
     "NotMasterworked": "{{material}} (Not Masterworked)",
-    "NumCombinations": "{{count, number}} вариант",
-    "NumCombinations_plural": "{{count, number}} вариантов",
-    "OptimizerExplanation": "Choose the stats you want, and their priority order, then choose which mods you want to use.",
-    "OptimizerExplanationArmour2Mods": "Stat changes from equipped Armor 2.0 Mods are excluded where possible, and are added back in when you select them.",
+    "OptimizerExplanationGuide": "Read the User Guide for more info and a video tutorial.",
+    "OptimizerExplanationMods": "Choose an exotic and any mods you want to use. Loadout Optimizer only includes stat bonuses from mods you choose - all mods already on the armor are ignored.",
+    "OptimizerExplanationSearch": "Use the search bar to filter the items Loadout Optimizer uses.",
+    "OptimizerExplanationStats": "Drag the most important stats to the top, and set stats you don't care about to Ignore.",
+    "OptimizerExplanationUpgrades": "Select which Armor Upgrades Loadout Optimizer can spend materials on. It may suggest masterworks to increase stats, or energy upgrades and element swaps to fit your requested mods.",
     "OptimizerSet": "Optimizer Set",
     "ProcessingSets": "Обработка наборов для\n{{character}}",
-    "ResetLocked": "Очистить предметы",
     "SaveAs": "Сохранить как",
     "SelectArmorUpgrade": "Select Armor Upgrades",
     "SelectAssumedArmorUpgrade": "Select Assumed Armor Upgrades",
     "SelectAssumedArmorUpgradeDescription": "Select armor upgrade strategies based on the materials you want to spend. Loadout Optimizer plans armor upgrades, which may increase stats or mod energy, or change an item's element.",
     "SelectMax": "- Макс. -",
     "SelectMin": "- Мин. -",
+    "ShareBuild": "Share Build Settings",
     "StatTierIgnoreOption": "Не учитывать",
     "StatTierIncludeOption": "Учитывать",
     "TheseModsCouldNotBeAssigned": "Модификаторы не могут быть добавлены в существующий Набор.",
@@ -485,7 +498,7 @@
     "CouldNotEquip": "Невозможно надеть {{itemname}}",
     "Create": "Набор",
     "CurrentlyEquipped": "Currently Equipped",
-    "Delete": "Delete",
+    "Delete": "Удалить",
     "Edit": "Изменить Набор",
     "EquippableDifferent1": "Multiple Exotic items were used to calculate your Maximum Power, so the number shown may not be achievable when equipping your items in-game.",
     "EquippableDifferent2": "Maximum Power isn't limited by the \"One Exotic\" rule when determining the Power of your drops/powerfuls/pinnacle rewards.",
@@ -579,7 +592,7 @@
     "DistributeEvenly": "Распределить равномерно",
     "Equip": "Надеть",
     "EquipWithName": "Надеть на {{character}}",
-    "Infuse": "Синтез",
+    "Infuse": "Infuse",
     "LockUnlock": {
       "Lock": "Заблокировать {{itemType}}",
       "Locked": "Заблокировано",
@@ -676,6 +689,7 @@
     "Stats": {
       "Aim": "Помощь в прицеливании",
       "Inventory": "Инвентарь",
+      "Power": "Power",
       "RPM": "Выстрелов в минуту",
       "Recoil": "Отдача",
       "Reload": "Скорость перезарядки"
@@ -699,6 +713,7 @@
     "QuestExpired": "Просрочен",
     "QuestExpires": "Устареет через:",
     "Quests": "Задания",
+    "Rank": "{{name}} {{rank}}",
     "RecordValue": "{{value}}",
     "Resets": "1 сброс",
     "Resets_plural": "{{count}} обнулений ранга",
@@ -723,6 +738,8 @@
     "UsageCount": "# Раз"
   },
   "Settings": {
+    "BadgePostmaster": "Show the number of postmaster items for the current character on app icon",
+    "BadgePostmasterExplanation": "For this to work you must install DIM as an app and your OS must support displaying badges",
     "CharacterOrder": "Сортировать персонажей по",
     "CharacterOrderFixed": "возраст (для ПК может глючить)",
     "CharacterOrderRecent": "активность",

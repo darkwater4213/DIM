@@ -1,5 +1,5 @@
 import React from 'react';
-import '../progress/faction.scss';
+import styles from './DiamondProgress.m.scss';
 
 interface Props {
   /** 0-1 progress for the outer ring */
@@ -14,12 +14,11 @@ interface Props {
 /**
  * A diamond-shaped progress bar (from faction icons).
  */
-export default function DiamondProgres({ progress, level, icon, className }: Props) {
+export default function DiamondProgress({ progress, level, icon, className }: Props) {
   const style = {
     strokeDashoffset: 121.622368 - 121.622368 * progress,
   };
 
-  // TODO: redo classes
   return (
     <div className={className}>
       <svg viewBox="0 0 48 48">
@@ -36,7 +35,7 @@ export default function DiamondProgres({ progress, level, icon, className }: Pro
           />
         )}
       </svg>
-      {level !== undefined && <div className="item-faction">{level}</div>}
+      {level !== undefined && <div className={styles.level}>{level}</div>}
     </div>
   );
 }

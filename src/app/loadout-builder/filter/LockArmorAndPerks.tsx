@@ -1,206 +1,125 @@
-import { settingsSelector } from 'app/dim-api/selectors';
+import { UpgradeSpendTier } from '@destinyitemmanager/dim-api-types';
+import ClosableContainer from 'app/dim-ui/ClosableContainer';
 import { t } from 'app/i18next-t';
-import { InventoryBuckets } from 'app/inventory/inventory-buckets';
 import { DimItem, PluggableInventoryItemDefinition } from 'app/inventory/item-types';
 import { DefItemIcon } from 'app/inventory/ItemIcon';
 import { bucketsSelector, storesSelector } from 'app/inventory/selectors';
 import { DimStore } from 'app/inventory/store-types';
 import { showItemPicker } from 'app/item-picker/item-picker';
-import ClosableContainer from 'app/loadout/loadout-ui/ClosableContainer';
 import LockedModIcon from 'app/loadout/loadout-ui/LockedModIcon';
 import { getModRenderKey } from 'app/loadout/mod-utils';
 import { useD2Definitions } from 'app/manifest/selectors';
-import { UpgradeSpendTier } from 'app/settings/initial-settings';
 import { addIcon, AppIcon, faTimesCircle, pinIcon } from 'app/shell/icons';
-import { RootState } from 'app/store/types';
 import { itemCanBeEquippedBy } from 'app/utils/item-utils';
 import _ from 'lodash';
-import React, { Dispatch, useState } from 'react';
+import React, { Dispatch, memo, useState } from 'react';
 import ReactDom from 'react-dom';
-import { connect } from 'react-redux';
-import { isArmor2WithStats } from '../../loadout/item-utils';
+import { useSelector } from 'react-redux';
+import { isLoadoutBuilderItem } from '../../loadout/item-utils';
 import { LoadoutBuilderAction } from '../loadout-builder-reducer';
 import LoadoutBucketDropTarget from '../LoadoutBucketDropTarget';
-import {
-  ItemsByBucket,
-  LockableBuckets,
-  LockedExclude,
-  LockedExotic,
-  LockedItemCase,
-  LockedItemType,
-  LockedMap,
-} from '../types';
-import { addLockedItem, removeLockedItem } from '../utils';
+import { ExcludedItems, LockableBucketHashes, PinnedItems } from '../types';
 import ArmorUpgradePicker, { SelectedArmorUpgrade } from './ArmorUpgradePicker';
 import ExoticPicker from './ExoticPicker';
 import styles from './LockArmorAndPerks.m.scss';
 import LockedItem from './LockedItem';
 
-interface ProvidedProps {
+interface Props {
   selectedStore: DimStore;
-  lockedMap: LockedMap;
+  pinnedItems: PinnedItems;
+  excludedItems: ExcludedItems;
   lockedMods: PluggableInventoryItemDefinition[];
   upgradeSpendTier: UpgradeSpendTier;
-  lockedExotic?: LockedExotic;
-  characterItems?: ItemsByBucket;
-  unusableExotics?: DimItem[];
+  lockItemEnergyType: boolean;
+  lockedExoticHash?: number;
   lbDispatch: Dispatch<LoadoutBuilderAction>;
-}
-
-interface StoreProps {
-  isPhonePortrait: boolean;
-  buckets: InventoryBuckets;
-  stores: DimStore[];
-  language: string;
-}
-
-type Props = ProvidedProps & StoreProps;
-
-function mapStateToProps() {
-  return (state: RootState): StoreProps => ({
-    isPhonePortrait: state.shell.isPhonePortrait,
-    buckets: bucketsSelector(state)!,
-    stores: storesSelector(state),
-    language: settingsSelector(state).language,
-  });
 }
 
 /**
  * A control section that allows for locking items and perks, or excluding items from generated sets.
  */
-function LockArmorAndPerks({
+export default memo(function LockArmorAndPerks({
   selectedStore,
-  lockedMap,
+  pinnedItems,
+  excludedItems,
   lockedMods,
   upgradeSpendTier,
-  buckets,
-  stores,
-  characterItems,
-  unusableExotics,
-  lockedExotic,
-  isPhonePortrait,
-  language,
+  lockItemEnergyType,
+  lockedExoticHash,
   lbDispatch,
 }: Props) {
   const [showExoticPicker, setShowExoticPicker] = useState(false);
   const [showArmorUpgradePicker, setShowArmorUpgradePicker] = useState(false);
   const defs = useD2Definitions()!;
+  const buckets = useSelector(bucketsSelector)!;
+  const stores = useSelector(storesSelector);
+
   /**
    * Lock currently equipped items on a character
    * Recomputes matched sets
    */
-  const lockEquipped = () => {
-    const newLockedMap: { [bucketHash: number]: LockedItemType[] } = {};
-    selectedStore.items.forEach((item) => {
-      if (item.equipped && isArmor2WithStats(item)) {
-        newLockedMap[item.bucket.hash] = [
-          {
-            type: 'item',
-            item,
-            bucket: item.bucket,
-          },
-        ];
-      }
+  const lockEquipped = () =>
+    lbDispatch({
+      type: 'setPinnedItems',
+      items: selectedStore.items.filter((item) => item.equipped && isLoadoutBuilderItem(item)),
     });
-    lbDispatch({ type: 'lockedMapChanged', lockedMap: { ...lockedMap, ...newLockedMap } });
-  };
-
-  /**
-   * Reset all locked items and recompute for all sets
-   * Recomputes matched sets
-   */
-  const resetLocked = () => {
-    lbDispatch({ type: 'lockedMapChanged', lockedMap: {} });
-  };
 
   const chooseItem =
     (updateFunc: (item: DimItem) => void, filter?: (item: DimItem) => boolean) =>
     async (e: React.MouseEvent) => {
       e.preventDefault();
 
-      const order = Object.values(LockableBuckets);
       try {
         const { item } = await showItemPicker({
           filterItems: (item: DimItem) =>
-            Boolean(
-              isArmor2WithStats(item) &&
-                itemCanBeEquippedBy(item, selectedStore, true) &&
-                (!filter || filter(item))
-            ),
-          sortBy: (item) => order.indexOf(item.bucket.hash),
+            isLoadoutBuilderItem(item) &&
+            itemCanBeEquippedBy(item, selectedStore, true) &&
+            (!filter || filter(item)),
+          sortBy: (item) => LockableBucketHashes.indexOf(item.bucket.hash),
         });
 
         updateFunc(item);
       } catch (e) {}
     };
 
-  const addLockedItemType = (item: LockedItemType) => {
-    if (item.bucket) {
-      lbDispatch({
-        type: 'lockedMapChanged',
-        lockedMap: {
-          ...lockedMap,
-          [item.bucket.hash]: addLockedItem(item, lockedMap[item.bucket.hash]),
-        },
-      });
-    }
-  };
-
-  const removeLockedItemType = (item: LockedItemType) => {
-    if (item.bucket) {
-      lbDispatch({
-        type: 'lockedMapChanged',
-        lockedMap: {
-          ...lockedMap,
-          [item.bucket.hash]: removeLockedItem(item, lockedMap[item.bucket.hash]),
-        },
-      });
-    }
-  };
-
-  const onModClicked = (mod: PluggableInventoryItemDefinition) => {
+  const onModClicked = (mod: PluggableInventoryItemDefinition) =>
     lbDispatch({
       type: 'removeLockedMod',
       mod,
     });
-  };
 
-  const addLockItem = (item: DimItem) =>
-    addLockedItemType({ type: 'item', item, bucket: item.bucket });
-  const addExcludeItem = (item: DimItem) =>
-    addLockedItemType({ type: 'exclude', item, bucket: item.bucket });
+  const pinItem = (item: DimItem) => lbDispatch({ type: 'pinItem', item });
+  const unpinItem = (item: DimItem) => lbDispatch({ type: 'unpinItem', item });
+  const excludeItem = (item: DimItem) => lbDispatch({ type: 'excludeItem', item });
+  const unExcludeItem = (item: DimItem) => lbDispatch({ type: 'unexcludeItem', item });
 
   const chooseLockItem = chooseItem(
-    addLockItem,
+    pinItem,
     // Exclude types that already have a locked item represented
-    (item) =>
-      !lockedMap[item.bucket.hash] || !lockedMap[item.bucket.hash]!.some((li) => li.type === 'item')
+    (item) => !pinnedItems[item.bucket.hash]
   );
-  const chooseExcludeItem = chooseItem(addExcludeItem);
+  const chooseExcludeItem = chooseItem(excludeItem);
 
-  let flatLockedMap = _.groupBy(
-    Object.values(lockedMap).flatMap((items) => items || []),
-    (item) => item.type
+  const allPinnedItems = _.sortBy(_.compact(Object.values(pinnedItems)), (i) =>
+    LockableBucketHashes.indexOf(i.bucket.hash)
   );
-
-  const order = Object.values(LockableBuckets);
-  flatLockedMap = _.mapValues(flatLockedMap, (items) =>
-    _.sortBy(items, (i: LockedItemCase) => order.indexOf(i.bucket.hash))
+  const allExcludedItems = _.sortBy(_.compact(Object.values(excludedItems)).flat(), (i) =>
+    LockableBucketHashes.indexOf(i.bucket.hash)
   );
 
   const storeIds = stores.filter((s) => !s.isVault).map((s) => s.id);
   const bucketTypes = buckets.byCategory.Armor.map((b) => b.type!);
 
-  const anyLocked = Object.values(lockedMap).some((lockedItems) => Boolean(lockedItems?.length));
   const modCounts: Record<number, number> = {};
 
-  const renderLockedItem = (lockedItem: LockedExclude) => (
-    <LockedItem key={lockedItem.item.id} lockedItem={lockedItem} onRemove={removeLockedItemType} />
-  );
   return (
-    <div>
+    <>
       <div className={styles.area}>
-        <SelectedArmorUpgrade defs={defs} upgradeSpendTier={upgradeSpendTier} />
+        <SelectedArmorUpgrade
+          defs={defs}
+          upgradeSpendTier={upgradeSpendTier}
+          lockItemEnergyType={lockItemEnergyType}
+        />
         <div className={styles.buttons}>
           <button
             type="button"
@@ -234,13 +153,13 @@ function LockArmorAndPerks({
         </div>
       </div>
       <div className={styles.area}>
-        {lockedExotic && (
+        {lockedExoticHash && (
           <div className={styles.itemGrid}>
             <ClosableContainer
               showCloseIconOnHover={true}
               onClose={() => lbDispatch({ type: 'removeLockedExotic' })}
             >
-              <DefItemIcon itemDef={lockedExotic.def} />
+              <DefItemIcon itemDef={defs.InventoryItem.get(lockedExoticHash)} />
             </ClosableContainer>
           </div>
         )}
@@ -254,10 +173,14 @@ function LockArmorAndPerks({
         className={styles.area}
         storeIds={storeIds}
         bucketTypes={bucketTypes}
-        onItemLocked={addLockItem}
+        onItemLocked={pinItem}
       >
-        {Boolean(flatLockedMap.item?.length) && (
-          <div className={styles.itemGrid}>{flatLockedMap.item.map(renderLockedItem)}</div>
+        {Boolean(allPinnedItems.length) && (
+          <div className={styles.itemGrid}>
+            {allPinnedItems.map((lockedItem) => (
+              <LockedItem key={lockedItem.id} lockedItem={lockedItem} onRemove={unpinItem} />
+            ))}
+          </div>
         )}
         <div className={styles.buttons}>
           <button type="button" className="dim-button" onClick={chooseLockItem}>
@@ -272,10 +195,14 @@ function LockArmorAndPerks({
         className={styles.area}
         storeIds={storeIds}
         bucketTypes={bucketTypes}
-        onItemLocked={addExcludeItem}
+        onItemLocked={excludeItem}
       >
-        {Boolean(flatLockedMap.exclude?.length) && (
-          <div className={styles.itemGrid}>{flatLockedMap.exclude.map(renderLockedItem)}</div>
+        {Boolean(allExcludedItems.length) && (
+          <div className={styles.itemGrid}>
+            {allExcludedItems.map((lockedItem) => (
+              <LockedItem key={lockedItem.id} lockedItem={lockedItem} onRemove={unExcludeItem} />
+            ))}
+          </div>
         )}
         <div className={styles.buttons}>
           <button type="button" className="dim-button" onClick={chooseExcludeItem}>
@@ -283,20 +210,12 @@ function LockArmorAndPerks({
           </button>
         </div>
       </LoadoutBucketDropTarget>
-      {anyLocked && (
-        <button type="button" className="dim-button" onClick={resetLocked}>
-          {t('LoadoutBuilder.ResetLocked')}
-        </button>
-      )}
       {showExoticPicker &&
         ReactDom.createPortal(
           <ExoticPicker
-            lockedExotic={lockedExotic}
-            characterItems={characterItems}
-            unusableExotics={unusableExotics}
-            isPhonePortrait={isPhonePortrait}
-            language={language}
-            lbDispatch={lbDispatch}
+            lockedExoticHash={lockedExoticHash}
+            classType={selectedStore.classType}
+            onSelected={(exotic) => lbDispatch({ type: 'lockExotic', lockedExoticHash: exotic })}
             onClose={() => setShowExoticPicker(false)}
           />,
           document.body
@@ -305,12 +224,17 @@ function LockArmorAndPerks({
         ReactDom.createPortal(
           <ArmorUpgradePicker
             currentUpgradeSpendTier={upgradeSpendTier}
+            lockItemEnergyType={lockItemEnergyType}
+            onLockItemEnergyTypeChanged={(checked) =>
+              lbDispatch({ type: 'lockItemEnergyTypeChanged', lockItemEnergyType: checked })
+            }
+            onUpgradeSpendTierChanged={(upgradeSpendTier) =>
+              lbDispatch({ type: 'upgradeSpendTierChanged', upgradeSpendTier })
+            }
             onClose={() => setShowArmorUpgradePicker(false)}
           />,
           document.body
         )}
-    </div>
+    </>
   );
-}
-
-export default connect<StoreProps>(mapStateToProps)(LockArmorAndPerks);
+});

@@ -8,7 +8,8 @@ import { d2ManifestSelector } from 'app/manifest/selectors';
 import { refresh } from 'app/shell/refresh';
 import { RootState } from 'app/store/types';
 import { toVendor } from 'app/vendors/d2-vendors';
-import { VendorItem } from 'app/vendors/vendor-item';
+import { vendorsByCharacterSelector } from 'app/vendors/selectors';
+import type { VendorItem } from 'app/vendors/vendor-item';
 import { DestinyCharacterActivitiesComponent } from 'bungie-api-ts/destiny2';
 import { ItemCategoryHashes } from 'data/d2/generated-enums';
 import pursuitsInfo from 'data/d2/pursuits.json';
@@ -75,7 +76,7 @@ export const purchasableBountiesSelector = (store: DimStore) =>
   createSelector(
     bucketsSelector,
     currentAccountSelector,
-    (state: RootState) => state.vendors.vendorsByCharacter[store.id]?.vendorsResponse,
+    (state: RootState) => vendorsByCharacterSelector(state)[store.id]?.vendorsResponse,
     d2ManifestSelector,
     (buckets, account, vendorsResponse, defs) => {
       if (!vendorsResponse) {
@@ -97,6 +98,7 @@ export const purchasableBountiesSelector = (store: DimStore) =>
           buckets,
           vendor,
           account,
+          store.id,
           itemComponents[vendorHash],
           sales.data?.[vendorHash]?.saleItems,
           {}

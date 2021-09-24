@@ -1,15 +1,17 @@
 import { D2ManifestDefinitions } from 'app/destiny2/d2-definitions';
-import { settingsSelector } from 'app/dim-api/selectors';
+import { languageSelector } from 'app/dim-api/selectors';
 import { t } from 'app/i18next-t';
 import { DimItem, PluggableInventoryItemDefinition } from 'app/inventory/item-types';
 import { allItemsSelector, profileResponseSelector } from 'app/inventory/selectors';
 import { plugIsInsertable } from 'app/item-popup/SocketDetails';
-import { d2ManifestSelector } from 'app/manifest/selectors';
+import { d2ManifestSelector, useD2Definitions } from 'app/manifest/selectors';
 import { itemsForPlugSet } from 'app/records/plugset-helpers';
 import { startWordRegexp } from 'app/search/search-filters/freeform';
 import { SearchFilterRef } from 'app/search/SearchBar';
 import { AppIcon, searchIcon } from 'app/shell/icons';
+import { useIsPhonePortrait } from 'app/shell/selectors';
 import { RootState } from 'app/store/types';
+import { isiOSBrowser } from 'app/utils/browsers';
 import { DestinyClass, DestinyProfileResponse } from 'bungie-api-ts/destiny2';
 import _ from 'lodash';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,7 +19,7 @@ import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
 import Sheet from '../../dim-ui/Sheet';
 import '../../item-picker/ItemPicker.scss';
-import { isArmor2WithStats } from '../item-utils';
+import { isLoadoutBuilderItem } from '../item-utils';
 import { isInsertableArmor2Mod, sortModGroups, sortMods } from '../mod-utils';
 import ModPickerFooter from './ModPickerFooter';
 import ModPickerSection from './ModPickerSection';
@@ -42,8 +44,6 @@ interface ProvidedProps {
 
 interface StoreProps {
   language: string;
-  isPhonePortrait: boolean;
-  defs: D2ManifestDefinitions;
   /**
    * An array of mods built from looking at the current DestinyClass's
    * items and finding all the available mods that could be socketed.
@@ -77,7 +77,7 @@ function mapStateToProps() {
           !item ||
           !item.sockets ||
           // Makes sure its an armour 2.0 item
-          !isArmor2WithStats(item) ||
+          !isLoadoutBuilderItem(item) ||
           // If classType is passed in only use items from said class otherwise use
           // items from all characters. Usefull if in loadouts and only mods and guns.
           !(classType === DestinyClass.Unknown || item.classType === classType)
@@ -127,9 +127,7 @@ function mapStateToProps() {
     }
   );
   return (state: RootState, props: ProvidedProps): StoreProps => ({
-    isPhonePortrait: state.shell.isPhonePortrait,
-    language: settingsSelector(state).language,
-    defs: d2ManifestSelector(state)!,
+    language: languageSelector(state),
     mods: unlockedModsSelector(state, props),
   });
 }
@@ -137,19 +135,12 @@ function mapStateToProps() {
 /**
  * A sheet to pick mods that are required in the final loadout sets.
  */
-function ModPicker({
-  defs,
-  mods,
-  language,
-  isPhonePortrait,
-  lockedMods,
-  initialQuery,
-  onAccept,
-  onClose,
-}: Props) {
+function ModPicker({ mods, language, lockedMods, initialQuery, onAccept, onClose }: Props) {
+  const defs = useD2Definitions()!;
   const [query, setQuery] = useState(initialQuery || '');
   const [lockedModsInternal, setLockedModsInternal] = useState(() => [...lockedMods]);
   const filterInput = useRef<SearchFilterRef | null>(null);
+  const isPhonePortrait = useIsPhonePortrait();
 
   useEffect(() => {
     if (!isPhonePortrait && filterInput.current) {
@@ -220,8 +211,7 @@ function ModPicker({
     _.groupBy(queryFilteredMods, (mod) => mod.plug.plugCategoryHash)
   ).sort(sortModGroups);
 
-  const autoFocus =
-    !isPhonePortrait && !(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream);
+  const autoFocus = !isPhonePortrait && !isiOSBrowser();
 
   const footer = lockedModsInternal.length
     ? ({ onClose }: { onClose(): void }) => (

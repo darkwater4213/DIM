@@ -2,6 +2,7 @@ import { DestinyVersion } from '@destinyitemmanager/dim-api-types';
 import { DestinyAccount } from 'app/accounts/destiny-account';
 import { getPlatforms, setActivePlatform } from 'app/accounts/platforms';
 import { accountsLoadedSelector, accountsSelector } from 'app/accounts/selectors';
+import Armory from 'app/armory/Armory';
 import Compare from 'app/compare/Compare';
 import ShowPageLoading from 'app/dim-ui/ShowPageLoading';
 import Farming from 'app/farming/Farming';
@@ -18,6 +19,7 @@ import { Hotkey } from '../hotkeys/hotkeys';
 import { itemTagList } from '../inventory/dim-item-info';
 import ItemPickerContainer from '../item-picker/ItemPickerContainer';
 import ItemPopupContainer from '../item-popup/ItemPopupContainer';
+import styles from './Destiny.m.scss';
 import ErrorPanel from './ErrorPanel';
 
 // TODO: Could be slightly better to group these a bit, but for now we break them each into a separate chunk.
@@ -202,7 +204,7 @@ function Destiny({ accountsLoaded, account, dispatch, profileError }: Props) {
 
   return (
     <>
-      <div id="content">
+      <div className={styles.content}>
         <Switch>
           <Route path={`${path}/inventory`} exact>
             <Inventory account={account} />
@@ -247,6 +249,17 @@ function Destiny({ accountsLoaded, account, dispatch, profileError }: Props) {
               <D1Vendors account={account} />
             )}
           </Route>
+          <Route
+            path={`${path}/armory/:itemHash`}
+            exact
+            render={({ match }) => (
+              <Armory
+                key={match.params.itemHash}
+                account={account}
+                itemHash={parseInt(match.params.itemHash!, 10)}
+              />
+            )}
+          />
           {account.destinyVersion === 1 && (
             <Route path={`${path}/record-books`} exact>
               <RecordBooks account={account} />

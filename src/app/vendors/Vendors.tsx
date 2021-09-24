@@ -5,32 +5,28 @@ import ShowPageLoading from 'app/dim-ui/ShowPageLoading';
 import { t } from 'app/i18next-t';
 import { useLoadStores } from 'app/inventory/store/hooks';
 import { getCurrentStore } from 'app/inventory/stores-helpers';
-import { d2ManifestSelector } from 'app/manifest/selectors';
+import { useD2Definitions } from 'app/manifest/selectors';
 import { VENDORS, VENDOR_GROUPS } from 'app/search/d2-known-values';
 import { ItemFilter } from 'app/search/filter-types';
 import { searchFilterSelector } from 'app/search/search-filter';
 import ErrorPanel from 'app/shell/ErrorPanel';
+import { querySelector, useIsPhonePortrait } from 'app/shell/selectors';
 import { RootState, ThunkDispatchProp } from 'app/store/types';
-import { emptyArray, emptyObject } from 'app/utils/empty';
 import { useEventBusListener } from 'app/utils/hooks';
 import {
-  DestinyCollectibleComponent,
   DestinyCurrenciesComponent,
   DestinyItemPlug,
   DestinyProfileResponse,
 } from 'bungie-api-ts/destiny2';
 import { motion, PanInfo } from 'framer-motion';
 import _ from 'lodash';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { connect } from 'react-redux';
+import React, { useCallback, useEffect, useState } from 'react';
+import { connect, useSelector } from 'react-redux';
 import { DestinyAccount } from '../accounts/destiny-account';
 import { D2ManifestDefinitions } from '../destiny2/d2-definitions';
 import CharacterSelect from '../dim-ui/CharacterSelect';
 import ErrorBoundary from '../dim-ui/ErrorBoundary';
-import { mergeCollectibles } from '../inventory/d2-stores';
-import { InventoryBuckets } from '../inventory/inventory-buckets';
 import {
-  bucketsSelector,
   ownedItemsSelector,
   profileResponseSelector,
   sortedStoresSelector,
@@ -43,9 +39,9 @@ import {
   D2VendorGroup,
   filterVendorGroupsToSearch,
   filterVendorGroupsToUnacquired,
-  toVendorGroups,
 } from './d2-vendors';
 import { VendorsState } from './reducer';
+import { vendorGroupsForCharacterSelector, vendorsByCharacterSelector } from './selectors';
 import Vendor from './Vendor';
 import VendorsMenu from './VendorsMenu';
 
@@ -54,10 +50,7 @@ interface ProvidedProps {
 }
 interface StoreProps {
   stores: DimStore[];
-  buckets?: InventoryBuckets;
-  defs?: D2ManifestDefinitions;
   ownedItemHashes: Set<number>;
-  isPhonePortrait: boolean;
   searchQuery: string;
   profileResponse?: DestinyProfileResponse;
   vendors: VendorsState['vendorsByCharacter'];
@@ -70,13 +63,10 @@ function mapStateToProps() {
   return (state: RootState): StoreProps => ({
     stores: sortedStoresSelector(state),
     ownedItemHashes: ownedItemSelectorInstance(state),
-    buckets: bucketsSelector(state),
-    defs: d2ManifestSelector(state),
-    isPhonePortrait: state.shell.isPhonePortrait,
-    searchQuery: state.shell.searchQuery,
+    searchQuery: querySelector(state),
     filterItems: searchFilterSelector(state),
     profileResponse: profileResponseSelector(state),
-    vendors: state.vendors.vendorsByCharacter,
+    vendors: vendorsByCharacterSelector(state),
   });
 }
 
@@ -86,11 +76,8 @@ type Props = ProvidedProps & StoreProps & ThunkDispatchProp;
  * The "All Vendors" page for D2 that shows all the rotating vendors.
  */
 function Vendors({
-  defs,
   stores,
-  buckets,
   ownedItemHashes,
-  isPhonePortrait,
   searchQuery,
   filterItems,
   profileResponse,
@@ -98,10 +85,16 @@ function Vendors({
   dispatch,
   account,
 }: Props) {
-  const [characterId, setCharacterId] = useState<string>();
+  const defs = useD2Definitions();
+  const isPhonePortrait = useIsPhonePortrait();
   const [filterToUnacquired, setFilterToUnacquired] = useState(false);
 
-  const selectedStoreId = characterId || getCurrentStore(stores)?.id;
+  // once the page is loaded, user can select this. on initial load, default to current char.
+  const [selectedStoreId, setSelectedStoreId] = useState(getCurrentStore(stores)?.id);
+
+  let vendorGroups = useSelector((state: RootState) =>
+    vendorGroupsForCharacterSelector(state, selectedStoreId)
+  );
 
   useLoadStores(account, stores.length > 0);
 
@@ -123,8 +116,6 @@ function Vendors({
     )
   );
 
-  const onCharacterChanged = (storeId: string) => setCharacterId(storeId);
-
   const handleSwipe = (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     // Velocity is in px/ms
     if (Math.abs(info.offset.x) < 10 || Math.abs(info.velocity.x) < 300) {
@@ -140,35 +131,14 @@ function Vendors({
       : characters.findIndex((s) => s.current);
 
     if (direction > 0 && selectedStoreIndex < characters.length - 1) {
-      setCharacterId(characters[selectedStoreIndex + 1].id);
+      setSelectedStoreId(characters[selectedStoreIndex + 1].id);
     } else if (direction < 0 && selectedStoreIndex > 0) {
-      setCharacterId(characters[selectedStoreIndex - 1].id);
+      setSelectedStoreId(characters[selectedStoreIndex - 1].id);
     }
   };
 
-  const mergedCollectibles = useMemo(
-    () =>
-      profileResponse
-        ? mergeCollectibles(
-            profileResponse.profileCollectibles,
-            profileResponse.characterCollectibles
-          )
-        : emptyObject<{
-            [x: number]: DestinyCollectibleComponent;
-          }>(),
-    [profileResponse]
-  );
-
   const vendorData = selectedStoreId ? vendors[selectedStoreId] : undefined;
   const vendorsResponse = vendorData?.vendorsResponse;
-
-  let vendorGroups = useMemo(
-    () =>
-      vendorsResponse && defs && buckets
-        ? toVendorGroups(vendorsResponse, defs, buckets, account, mergedCollectibles)
-        : emptyArray<D2VendorGroup>(),
-    [account, buckets, defs, mergedCollectibles, vendorsResponse]
-  );
 
   if (!vendorsResponse && vendorData?.error) {
     return (
@@ -227,9 +197,8 @@ function Vendors({
         {selectedStore && (
           <CharacterSelect
             stores={stores}
-            isPhonePortrait={isPhonePortrait}
             selectedStore={selectedStore}
-            onCharacterChanged={onCharacterChanged}
+            onCharacterChanged={setSelectedStoreId}
           />
         )}
         {selectedStore && (

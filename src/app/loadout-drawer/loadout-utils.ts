@@ -4,7 +4,7 @@ import { bungieNetPath } from 'app/dim-ui/BungieImage';
 import { t } from 'app/i18next-t';
 import { DimCharacterStat, DimStore } from 'app/inventory/store-types';
 import { isPluggableItem } from 'app/inventory/store/sockets';
-import { isArmor2WithStats } from 'app/loadout/item-utils';
+import { isLoadoutBuilderItem } from 'app/loadout/item-utils';
 import { isInsertableArmor2Mod, sortMods } from 'app/loadout/mod-utils';
 import { armorStats } from 'app/search/d2-known-values';
 import { emptyArray } from 'app/utils/empty';
@@ -18,7 +18,7 @@ import { Loadout, LoadoutItem } from './loadout-types';
 
 const excludeGearSlots = ['Class', 'SeasonalArtifacts'];
 // order to display a list of all 8 gear slots
-const gearSlotOrder = [
+const gearSlotOrder: DimItem['type'][] = [
   ...D2Categories.Weapons.filter((t) => !excludeGearSlots.includes(t)),
   ...D2Categories.Armor,
 ];
@@ -192,7 +192,7 @@ export function convertToLoadoutItem(item: LoadoutItem, equipped: boolean) {
 
 /** Extracts the equipped armour 2.0 mod hashes from the item */
 export function extractArmorModHashes(item: DimItem) {
-  if (!isArmor2WithStats(item) || !item.sockets) {
+  if (!isLoadoutBuilderItem(item) || !item.sockets) {
     return [];
   }
   return _.compact(
@@ -203,6 +203,28 @@ export function extractArmorModHashes(item: DimItem) {
         socket.plugged.plugDef.hash
     )
   );
+}
+
+function findItem(allItems: DimItem[], loadoutItem: LoadoutItem): DimItem | undefined {
+  for (const item of allItems) {
+    if (
+      (loadoutItem.id && loadoutItem.id !== '0' && loadoutItem.id === item.id) ||
+      ((!loadoutItem.id || loadoutItem.id === '0') && loadoutItem.hash === item.hash)
+    ) {
+      return item;
+    }
+  }
+  return undefined;
+}
+
+export function isMissingItems(allItems: DimItem[], loadout: Loadout): boolean {
+  for (const loadoutItem of loadout.items) {
+    const item = findItem(allItems, loadoutItem);
+    if (!item) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -218,22 +240,10 @@ export function getItemsFromLoadoutItems(
     return [emptyArray(), emptyArray()];
   }
 
-  const findItem = (loadoutItem: LoadoutItem) => {
-    for (const item of allItems) {
-      if (
-        (loadoutItem.id && loadoutItem.id !== '0' && loadoutItem.id === item.id) ||
-        ((!loadoutItem.id || loadoutItem.id === '0') && loadoutItem.hash === item.hash)
-      ) {
-        return item;
-      }
-    }
-    return undefined;
-  };
-
   const items: DimItem[] = [];
   const warnitems: DimItem[] = [];
   for (const loadoutItem of loadoutItems) {
-    const item = findItem(loadoutItem);
+    const item = findItem(allItems, loadoutItem);
     if (item) {
       items.push(item);
     } else {

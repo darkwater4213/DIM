@@ -1,23 +1,30 @@
-import { LoadoutParameters } from '@destinyitemmanager/dim-api-types';
-import UserGuideLink from 'app/dim-ui/UserGuideLink';
+import { LoadoutParameters, UpgradeSpendTier } from '@destinyitemmanager/dim-api-types';
 import { t } from 'app/i18next-t';
 import { DimItem, PluggableInventoryItemDefinition } from 'app/inventory/item-types';
 import { Loadout } from 'app/loadout-drawer/loadout-types';
-import { newLoadout } from 'app/loadout-drawer/loadout-utils';
-import { editLoadout } from 'app/loadout-drawer/LoadoutDrawer';
-import { UpgradeSpendTier } from 'app/settings/initial-settings';
+import raidModPlugCategoryHashes from 'data/d2/raid-mod-plug-category-hashes.json';
 import _ from 'lodash';
 import React, { Dispatch, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { List, WindowScroller } from 'react-virtualized';
 import { DimStore } from '../../inventory/store-types';
 import { LoadoutBuilderAction } from '../loadout-builder-reducer';
-import { ArmorSet, LockedMap, StatTypes } from '../types';
+import { ArmorSet, PinnedItems } from '../types';
 import GeneratedSet from './GeneratedSet';
 import styles from './GeneratedSets.m.scss';
 
-/** Taller item groups have either the swap icon under the item of an exotic perk. */
-function hasExoticPerkOrSwapIcon(items: DimItem[]) {
-  return items.length > 1 || items.some((item) => item.isExotic);
+/** Taller item groups have either the swap icon under the item, an exotic perk, or a raid mod socket. */
+function hasExoticPerkRaidModOrSwapIcon(items: DimItem[]) {
+  return (
+    items.length > 1 ||
+    items.some(
+      (item) =>
+        item.isExotic ||
+        item.sockets?.allSockets.some(
+          ({ plugged }) =>
+            plugged && raidModPlugCategoryHashes.includes(plugged.plugDef.plug.plugCategoryHash)
+        )
+    )
+  );
 }
 
 /**
@@ -39,7 +46,7 @@ function getMeasureSet(sets: readonly ArmorSet[]): [ArmorSet | undefined, number
     let countWithExoticPerkOrSwapIcon = 0;
     // So we look on those rows for items with the swap icon or an exotic perk.
     for (const indexes of [[0, 1], [2, 3], [4]]) {
-      if (indexes.some((index) => hasExoticPerkOrSwapIcon(set.armor[index]))) {
+      if (indexes.some((index) => hasExoticPerkRaidModOrSwapIcon(set.armor[index]))) {
         countWithExoticPerkOrSwapIcon++;
       }
     }
@@ -57,36 +64,34 @@ function getMeasureSet(sets: readonly ArmorSet[]): [ArmorSet | undefined, number
 interface Props {
   selectedStore: DimStore;
   sets: readonly ArmorSet[];
-  combos: number;
-  combosWithoutCaps: number;
-  lockedMap: LockedMap;
-  statOrder: StatTypes[];
-  enabledStats: Set<StatTypes>;
   lockedMods: PluggableInventoryItemDefinition[];
+  pinnedItems: PinnedItems;
+  statOrder: number[];
+  enabledStats: Set<number>;
   loadouts: Loadout[];
   lbDispatch: Dispatch<LoadoutBuilderAction>;
   params: LoadoutParameters;
   halfTierMods: PluggableInventoryItemDefinition[];
   upgradeSpendTier: UpgradeSpendTier;
+  lockItemEnergyType: boolean;
 }
 
 /**
  * Renders the entire list of generated stat mixes, one per mix.
  */
 export default function GeneratedSets({
-  lockedMap,
+  lockedMods,
+  pinnedItems,
   selectedStore,
   sets,
   statOrder,
-  combos,
-  combosWithoutCaps,
   enabledStats,
-  lockedMods,
   loadouts,
   lbDispatch,
   params,
   halfTierMods,
   upgradeSpendTier,
+  lockItemEnergyType,
 }: Props) {
   const windowScroller = useRef<WindowScroller>(null);
   const [{ rowHeight, rowWidth }, setRowSize] = useState<{
@@ -138,42 +143,22 @@ export default function GeneratedSets({
 
   return (
     <div className={styles.sets}>
-      <h2>
-        {t('LoadoutBuilder.GeneratedBuilds')}{' '}
-        <span className={styles.numSets}>
-          ({t('LoadoutBuilder.NumCombinations', { count: sets.length })})
-        </span>
-        <button
-          type="button"
-          className={`dim-button ${styles.newLoadout}`}
-          onClick={() => editLoadout(newLoadout('', []), { showClass: true, isNew: true })}
-        >
-          {t('LoadoutBuilder.NewEmptyLoadout')}
-        </button>
-      </h2>
-      <UserGuideLink topic="Loadout_Optimizer" />
-      <p>
-        {t('LoadoutBuilder.OptimizerExplanation')}{' '}
-        {t('LoadoutBuilder.OptimizerExplanationArmour2Mods')}
-      </p>
-      {combos !== combosWithoutCaps && (
-        <p>{t('LoadoutBuilder.LimitedCombos', { combos, combosWithoutCaps })}</p>
-      )}
       {measureSet ? (
         <GeneratedSet
           ref={setRowHeight}
           style={{}}
           set={measureSet}
           selectedStore={selectedStore}
-          lockedMap={lockedMap}
+          lockedMods={lockedMods}
+          pinnedItems={pinnedItems}
           lbDispatch={lbDispatch}
           statOrder={statOrder}
           enabledStats={enabledStats}
-          lockedMods={lockedMods}
           loadouts={loadouts}
           params={params}
           halfTierMods={halfTierMods}
           upgradeSpendTier={upgradeSpendTier}
+          lockItemEnergyType={lockItemEnergyType}
         />
       ) : sets.length > 0 ? (
         <WindowScroller ref={windowScroller}>
@@ -193,15 +178,16 @@ export default function GeneratedSets({
                   style={style}
                   set={sets[index]}
                   selectedStore={selectedStore}
-                  lockedMap={lockedMap}
+                  lockedMods={lockedMods}
+                  pinnedItems={pinnedItems}
                   lbDispatch={lbDispatch}
                   statOrder={statOrder}
                   enabledStats={enabledStats}
-                  lockedMods={lockedMods}
                   loadouts={loadouts}
                   params={params}
                   halfTierMods={halfTierMods}
                   upgradeSpendTier={upgradeSpendTier}
+                  lockItemEnergyType={lockItemEnergyType}
                 />
               )}
               scrollTop={scrollTop}
@@ -209,20 +195,7 @@ export default function GeneratedSets({
           )}
         </WindowScroller>
       ) : (
-        <>
-          <h3>{t('LoadoutBuilder.NoBuildsFoundWithReasons')}</h3>
-          <ul>
-            <li className={styles.emptyListReason}>
-              {t('LoadoutBuilder.NoBuildsFoundExoticsAndMods')}
-            </li>
-            <li className={styles.emptyListReason}>
-              {t('LoadoutBuilder.NoBuildsFoundModsAreTooExpensive')}
-            </li>
-            <li className={styles.emptyListReason}>
-              {t('LoadoutBuilder.NoBuildsFoundSeasonalModNotSatisfied')}
-            </li>
-          </ul>
-        </>
+        <h3>{t('LoadoutBuilder.NoBuildsFoundWithReasons')}</h3>
       )}
     </div>
   );

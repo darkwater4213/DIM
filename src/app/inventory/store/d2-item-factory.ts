@@ -2,10 +2,12 @@ import { t } from 'app/i18next-t';
 import { THE_FORBIDDEN_BUCKET } from 'app/search/d2-known-values';
 import { errorLog, warnLog } from 'app/utils/log';
 import {
+  BucketCategory,
   ComponentPrivacySetting,
   DestinyAmmunitionType,
   DestinyClass,
   DestinyCollectibleComponent,
+  DestinyCollectibleState,
   DestinyInventoryItemDefinition,
   DestinyItemComponent,
   DestinyItemComponentSetOfint64,
@@ -87,6 +89,17 @@ export function processItems(
     if (createdItem !== null) {
       createdItem.owner = owner.id;
       result.push(createdItem);
+    } else {
+      // the item failed to be created for some reason. 3 things can currently cause this:
+      // an exception occurred, the item lacks a definition, or it lacks one of either name||questLineName
+      // not all of these should cause the store to consider itself hadErrors.
+      // dummies and invisible items are not a big deal
+
+      const bucketDef = defs.InventoryBucket[item.bucketHash];
+      // if it's a named, non-invisible bucket, it may be a problem that the item wasn't generated
+      if (bucketDef.category !== BucketCategory.Invisible && bucketDef.displayProperties.name) {
+        owner.hadErrors = true;
+      }
     }
   }
   return result;
@@ -194,7 +207,9 @@ export function makeItemSingle(
  * @param previousItems a set of item IDs representing the previous store's items
  * @param newItems a set of item IDs representing the previous list of new items
  * @param item "raw" item from the Destiny API
- * @param owner the ID of the owning store.
+ * @param owner the ID of the owning store
+ * @param mergedCollectibles collectible information so each DimItem is self-aware of whether it's already owned
+ * @param uninstancedItemObjectives the owning character's dictionary of uninstanced objectives
  */
 // TODO: extract individual item components first!
 export function makeItem(
@@ -230,7 +245,7 @@ export function makeItem(
     );
   }
 
-  if (!itemDef || !(itemDef.displayProperties.name || itemDef.setData?.questLineName)) {
+  if (!(itemDef.displayProperties.name || itemDef.setData?.questLineName)) {
     return null;
   }
 
@@ -317,9 +332,17 @@ export function makeItem(
     itemDef.iconWatermarkShelved ||
     undefined;
 
-  const collectible =
-    itemDef.collectibleHash && mergedCollectibles && mergedCollectibles[itemDef.collectibleHash];
+  // collection stuff: establish a collectedness state, and hashes leading to the collectible and source
+  const { collectibleHash } = itemDef;
+  let collectibleState: DestinyCollectibleState | undefined;
+  if (collectibleHash) {
+    collectibleState = mergedCollectibles?.[collectibleHash]?.state;
+  }
+  const source = collectibleHash
+    ? defs.Collectible.get(collectibleHash, itemDef.hash)?.sourceHash
+    : undefined;
 
+  // items' appearance can be overridden at bungie's request
   let overrideStyleItem = item.overrideStyleItemHash
     ? defs.InventoryItem.get(item.overrideStyleItemHash)
     : null;
@@ -359,7 +382,6 @@ export function makeItem(
     itemCategoryHashes: itemDef.itemCategoryHashes || [], // see defs.ItemCategory
     tier: tiers[itemDef.inventory!.tierType] || 'Common',
     isExotic: tiers[itemDef.inventory!.tierType] === 'Exotic',
-    isVendorItem: !owner || owner.id === null,
     name,
     description: displayProperties.description,
     icon:
@@ -400,11 +422,9 @@ export function makeItem(
     loreHash: itemDef.loreHash,
     previewVendor: itemDef.preview?.previewVendorHash,
     ammoType: itemDef.equippingBlock ? itemDef.equippingBlock.ammoType : DestinyAmmunitionType.None,
-    source: itemDef.collectibleHash
-      ? defs.Collectible.get(itemDef.collectibleHash, itemDef.hash)?.sourceHash
-      : undefined,
-    collectibleState: collectible ? collectible.state : undefined,
-    collectibleHash: itemDef.collectibleHash,
+    source,
+    collectibleState,
+    collectibleHash,
     missingSockets: false,
     displaySource: itemDef.displaySource,
     plug: itemDef.plug && {
@@ -488,16 +508,14 @@ export function makeItem(
     reportException('TalentGrid', e, { itemHash: item.itemHash });
   }
 
-  const objectiveData = itemComponents?.objectives?.data;
   try {
-    if (objectiveData) {
-      createdItem.objectives = buildObjectives(
-        item,
-        objectiveData,
-        defs,
-        uninstancedItemObjectives
-      );
-    }
+    createdItem.objectives = buildObjectives(
+      item,
+      itemDef,
+      itemComponents?.objectives?.data,
+      defs,
+      uninstancedItemObjectives
+    );
   } catch (e) {
     errorLog('d2-stores', `Error building objectives for ${createdItem.name}`, item, itemDef, e);
     reportException('Objectives', e, { itemHash: item.itemHash });
@@ -663,6 +681,7 @@ function buildPursuitInfo(
   ) {
     createdItem.pursuit = {
       ...createdItem.pursuit,
+      questLineDescription: itemDef.setData.questLineDescription,
       questStepNum: itemDef.setData.itemList.findIndex((i) => i.itemHash === itemDef.hash) + 1,
       questStepsTotal: itemDef.setData.itemList.length,
     };

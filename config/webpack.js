@@ -75,20 +75,25 @@ module.exports = (env) => {
       publicPath: '/',
       filename: env.dev ? '[name]-[fullhash].js' : '[name]-[contenthash:6].js',
       chunkFilename: env.dev ? '[name]-[fullhash].js' : '[name]-[contenthash:6].js',
+      assetModuleFilename: ASSET_NAME_PATTERN,
     },
 
     // Dev server
     devServer: env.dev
       ? {
           host: process.env.DOCKER ? '0.0.0.0' : 'localhost',
-          stats: 'errors-only',
           https: {
             key: fs.readFileSync('key.pem'), // Private keys in PEM format.
             cert: fs.readFileSync('cert.pem'), // Cert chains in PEM format.
           },
+          devMiddleware: {
+            stats: 'errors-only',
+          },
+          client: {
+            overlay: false,
+          },
           historyApiFallback: true,
-          hot: true,
-          hotOnly: true,
+          hot: 'only',
           liveReload: false,
         }
       : undefined,
@@ -157,16 +162,16 @@ module.exports = (env) => {
         {
           // Optimize SVGs - mostly for destiny-icons.
           test: /\.svg$/,
-          use: [
-            {
-              loader: 'url-loader',
-              options: {
-                limit: 5 * 1024, // only inline if less than 5kb
-                name: ASSET_NAME_PATTERN,
-                // Use smaller data URIs
-                generator: (content) => svgToMiniDataURI(content.toString()),
-              },
+          type: 'asset',
+          generator: {
+            dataUrl: (content) => svgToMiniDataURI(content.toString()),
+          },
+          parser: {
+            dataUrlCondition: {
+              maxSize: 5 * 1024, // only inline if less than 5kb
             },
+          },
+          use: [
             {
               loader: 'svgo-loader',
             },
@@ -174,10 +179,11 @@ module.exports = (env) => {
         },
         {
           test: /\.(jpg|gif|png|eot|ttf|woff(2)?)(\?v=\d+\.\d+\.\d+)?/,
-          loader: 'url-loader',
-          options: {
-            limit: 5 * 1024, // only inline if less than 5kb
-            name: ASSET_NAME_PATTERN,
+          type: 'asset',
+          parser: {
+            dataUrlCondition: {
+              maxSize: 5 * 1024, // only inline if less than 5kb
+            },
           },
         },
         // *.m.scss will have CSS Modules support
@@ -254,15 +260,12 @@ module.exports = (env) => {
           loader: 'source-map-loader',
         },
         {
-          type: 'javascript/auto',
           test: /\.json/,
           include: /src(\/|\\)locale/,
-          use: [
-            {
-              loader: 'file-loader',
-              options: { name: '[name]-[contenthash:6].[ext]' },
-            },
-          ],
+          type: 'asset/resource',
+          generator: {
+            filename: '[name]-[contenthash:6].[ext]',
+          },
         },
         {
           type: 'javascript/auto',
@@ -390,8 +393,6 @@ module.exports = (env) => {
         '$featureFlags.debugSW': JSON.stringify(!env.release),
         // Send exception reports to Sentry.io on beta/prod only
         '$featureFlags.sentry': JSON.stringify(!env.dev),
-        // Respect the "do not track" header
-        '$featureFlags.respectDNT': JSON.stringify(!env.release),
         // Community-curated wish lists
         '$featureFlags.wishLists': JSON.stringify(true),
         // Show a banner for supporting a charitable cause
@@ -399,27 +400,15 @@ module.exports = (env) => {
         // Show the triage tab in the item popup
         '$featureFlags.triage': JSON.stringify(env.dev),
         // Drag and drop mobile inspect
-        '$featureFlags.mobileInspect': JSON.stringify(true),
-        // Move the pull from button
-        '$featureFlags.movePullFromButton': JSON.stringify(env.dev),
+        '$featureFlags.mobileInspect': JSON.stringify(env.release),
         // Enable alternative inventory mode
-        '$featureFlags.altInventoryMode': JSON.stringify(!env.release),
-        // Enable search results
-        '$featureFlags.searchResults': JSON.stringify(env.dev),
+        '$featureFlags.altInventoryMode': JSON.stringify(false),
         // Alternate perks display on item popup
         '$featureFlags.newPerks': JSON.stringify(!env.release),
         // Advanced Write Actions (inserting mods)
         '$featureFlags.awa': JSON.stringify(process.env.USER === 'brh'), // Only Ben has the keys...
-        // Incorporate mods directly into loadouts
-        '$featureFlags.loadoutMods': JSON.stringify(!env.release),
-        // Show bounty guide
-        '$featureFlags.bountyGuide': JSON.stringify(true),
         // Ability cooldowns in stats tooltips
         '$featureFlags.abilityCooldowns': JSON.stringify(true),
-        // Install prompt banners for mobile
-        '$featureFlags.installBanner': JSON.stringify(!env.release),
-        // Header banner when postmaster is full
-        '$featureFlags.postmasterBanner': JSON.stringify(!env.release),
       }),
 
       new LodashModuleReplacementPlugin({

@@ -26,7 +26,7 @@ export const sortPursuits = chainComparator(
   compareBy(showPursuitAsExpired),
   compareBy((item) => !item.tracked),
   compareBy((item) => item.complete),
-  compareBy((item) => item.pursuit?.expirationDate || defaultExpirationDate),
+  compareBy((item) => (item.pursuit?.expirationDate || defaultExpirationDate).getTime()),
   compareBy((item) => item.typeName),
   compareBy((item) => item.icon),
   compareBy((item) => item.name)
@@ -109,16 +109,14 @@ function PursuitsGroup({
 
   return (
     <>
-      {$featureFlags.bountyGuide && (
-        <BountyGuide
-          store={store}
-          bounties={pursuits}
-          selectedFilters={bountyFilters}
-          onSelectedFiltersChanged={setBountyFilters}
-          skipTypes={skipTypes}
-          pursuitsInfo={seasonalChallengesInfo}
-        />
-      )}
+      <BountyGuide
+        store={store}
+        bounties={pursuits}
+        selectedFilters={bountyFilters}
+        onSelectedFiltersChanged={setBountyFilters}
+        skipTypes={skipTypes}
+        pursuitsInfo={seasonalChallengesInfo}
+      />
       <div className="progress-for-character">
         {pursuits.sort(sortPursuits).map((item) => (
           <Pursuit

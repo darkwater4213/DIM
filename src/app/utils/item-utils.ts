@@ -85,7 +85,7 @@ export const getSpecialtySocketMetadatas = (item?: DimItem): ModSocketMetadata[]
 
 /**
  * combat and legacy slots are boring now. everything has them.
- * this focuses on narower stuff: raid & nightmare mod
+ * this focuses on narrower stuff: raid & nightmare mod
  */
 export const getInterestingSocketMetadatas = (item?: DimItem): ModSocketMetadata[] | undefined => {
   const specialtySockets = getSpecialtySocketMetadatas(item)?.filter(
@@ -103,13 +103,13 @@ export const getModTypeTagByPlugCategoryHash = (plugCategoryHash: number): strin
   modTypeTagByPlugCategoryHash[plugCategoryHash];
 
 /**
- * returns, if there are any, the localized names of an item's specialty slots
+ * returns, if there are any, the localized names of an item's (non-combat) specialty slots
  */
-export const getItemSpecialtyModSlotDisplayNames = (
+export const getItemInterestingSpecialtyModSlotDisplayNames = (
   item: DimItem,
   defs: D2ManifestDefinitions
 ): string[] | undefined => {
-  const displayNames = getSpecialtySocketMetadatas(item)
+  const displayNames = getInterestingSocketMetadatas(item)
     ?.map((m) => {
       const { emptyModSocketHash } = m;
       return (
@@ -318,6 +318,11 @@ export function isPlugStatActive(
   if (!isConditionallyActive) {
     return true;
   }
+
+  if (plugHash === modsWithConditionalStats.elementalCapacitor) {
+    return false;
+  }
+
   if (
     plugHash === modsWithConditionalStats.powerfulFriends ||
     plugHash === modsWithConditionalStats.radiantLight

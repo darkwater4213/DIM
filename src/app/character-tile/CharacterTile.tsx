@@ -1,9 +1,8 @@
 import type { DimStore } from 'app/inventory/store-types';
 import { AppIcon, powerActionIcon } from 'app/shell/icons';
-import { isPhonePortraitSelector } from 'app/shell/selectors';
+import { useIsPhonePortrait } from 'app/shell/selectors';
 import VaultCapacity from 'app/store-stats/VaultCapacity';
 import React from 'react';
-import { useSelector } from 'react-redux';
 import styles from './CharacterTile.m.scss';
 
 function CharacterEmblem({ store }: { store: DimStore }) {
@@ -16,7 +15,7 @@ function CharacterEmblem({ store }: { store: DimStore }) {
  */
 export default function CharacterTile({ store }: { store: DimStore }) {
   const maxTotalPower = Math.floor(store.stats?.maxTotalPower?.value || store.powerLevel);
-  const isPhonePortrait = useSelector(isPhonePortraitSelector);
+  const isPhonePortrait = useIsPhonePortrait();
 
   return (
     <div className={styles.characterTile}>
@@ -50,7 +49,7 @@ export default function CharacterTile({ store }: { store: DimStore }) {
             isPhonePortrait && <VaultCapacity />
           ) : (
             <>
-              <div className="race-gender">{store.race}</div>
+              <div>{store.race}</div>
               {store.destinyVersion === 1 && store.level < 40 && (
                 <div className={styles.level}>{store.level}</div>
               )}

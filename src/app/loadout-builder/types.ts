@@ -1,22 +1,6 @@
-import { InventoryBucket } from 'app/inventory/inventory-buckets';
-import {
-  armor2PlugCategoryHashesByName,
-  armorBuckets,
-  D2ArmorStatHashByName,
-} from 'app/search/d2-known-values';
-import { DestinyInventoryItemDefinition } from 'bungie-api-ts/destiny2';
-import { BucketHashes } from 'data/d2/generated-enums';
-import _ from 'lodash';
-import { DimItem, PluggableInventoryItemDefinition } from '../inventory/item-types';
-
-// todo: get this from d2-known-values
-export type StatTypes =
-  | 'Mobility'
-  | 'Resilience'
-  | 'Recovery'
-  | 'Discipline'
-  | 'Intellect'
-  | 'Strength';
+import { armor2PlugCategoryHashesByName, armorBuckets } from 'app/search/d2-known-values';
+import { StatHashes } from 'data/d2/generated-enums';
+import { DimItem } from '../inventory/item-types';
 
 export interface MinMax {
   min: number;
@@ -29,45 +13,22 @@ export interface MinMaxIgnored {
   ignored: boolean;
 }
 
-export interface LockedItemCase {
-  type: 'item';
-  item: DimItem;
-  bucket: InventoryBucket;
-}
+/** A map from bucketHash to the pinned item if there is one. */
+export type PinnedItems = {
+  [bucketHash: number]: DimItem | undefined;
+};
 
-export interface LockedExclude {
-  type: 'exclude';
-  item: DimItem;
-  bucket: InventoryBucket;
-}
-
-export interface LockedExotic {
-  def: DestinyInventoryItemDefinition;
-  /** The bucket has the exotic belongs to (e.g. arms). */
-  bucketHash: BucketHashes;
-}
-
-export interface LockedExoticWithPlugs extends LockedExotic {
-  /** The intrinsic perk that is unique to this exotic. */
-  exoticPerk?: PluggableInventoryItemDefinition;
-  /** If the exotic has unique exotic mods (e.g. aeon soul) this will be populated with those mods. */
-  exoticMods?: PluggableInventoryItemDefinition[];
-  isArmor1: boolean;
-}
-
-export type LockedItemType = LockedItemCase | LockedExclude;
-
-/** A map from bucketHash to the list of locked and excluded perks, items, and burns. */
-export type LockedMap = Readonly<{
-  [bucketHash: number]: readonly LockedItemType[] | undefined;
-}>;
+/** A map from bucketHash to any excluded items. */
+export type ExcludedItems = {
+  [bucketHash: number]: DimItem[] | undefined;
+};
 
 /**
  * An individual "stat mix" of loadouts where each slot has a list of items with the same stat options.
  */
 export interface ArmorSet {
   /** The overall stats for the loadout as a whole. */
-  readonly stats: Readonly<{ [statType in StatTypes]: number }>;
+  readonly stats: Readonly<ArmorStats>;
   /** For each armor type (see LockableBuckets), this is the list of items that could interchangeably be put into this loadout. */
   readonly armor: readonly DimItem[][];
 }
@@ -97,21 +58,17 @@ export const bucketsToCategories = {
   [LockableBuckets.classitem]: armor2PlugCategoryHashesByName.classitem,
 };
 
-// to-do: deduplicate this and use D2ArmorStatHashByName instead
-export const statHashes: { [type in StatTypes]: number } = {
-  Mobility: D2ArmorStatHashByName.mobility,
-  Resilience: D2ArmorStatHashByName.resilience,
-  Recovery: D2ArmorStatHashByName.recovery,
-  Discipline: D2ArmorStatHashByName.discipline,
-  Intellect: D2ArmorStatHashByName.intellect,
-  Strength: D2ArmorStatHashByName.strength,
-};
+export type ArmorStatHashes =
+  | StatHashes.Mobility
+  | StatHashes.Resilience
+  | StatHashes.Recovery
+  | StatHashes.Discipline
+  | StatHashes.Intellect
+  | StatHashes.Strength;
 
-export const statValues = Object.values(statHashes);
-export const statKeys = Object.keys(statHashes) as StatTypes[];
-
-// Need to force the type as lodash converts the StatTypes type to string.
-export const statHashToType = _.invert(statHashes) as { [hash: number]: StatTypes };
+export type StatRanges = { [statHash in ArmorStatHashes]: MinMax };
+export type StatFilters = { [statHash in ArmorStatHashes]: MinMaxIgnored };
+export type ArmorStats = { [statHash in ArmorStatHashes]: number };
 
 /**
  * The resuablePlugSetHash from armour 2.0's general socket.

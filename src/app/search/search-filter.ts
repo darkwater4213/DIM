@@ -1,5 +1,5 @@
 import { ItemHashTag } from '@destinyitemmanager/dim-api-types';
-import { settingsSelector } from 'app/dim-api/selectors';
+import { languageSelector } from 'app/dim-api/selectors';
 import { RootState } from 'app/store/types';
 import { errorLog } from 'app/utils/log';
 import _ from 'lodash';
@@ -9,6 +9,7 @@ import { DimItem } from '../inventory/item-types';
 import {
   allItemsSelector,
   currentStoreSelector,
+  displayableBucketHashesSelector,
   itemHashTagsSelector,
   itemInfosSelector,
   sortedStoresSelector,
@@ -22,6 +23,7 @@ import { InventoryWishListRoll } from '../wishlists/wishlists';
 import { FilterContext, ItemFilter } from './filter-types';
 import { parseQuery, QueryAST } from './query-parser';
 import { SearchConfig, searchConfigSelector } from './search-config';
+import { parseAndValidateQuery } from './search-utils';
 
 //
 // Selectors
@@ -42,7 +44,7 @@ export const filterFactorySelector = createSelector(
   (state: RootState) => state.inventory.newItems,
   itemInfosSelector,
   itemHashTagsSelector,
-  (state: RootState) => settingsSelector(state).language,
+  languageSelector,
   makeSearchFilterFactory
 );
 
@@ -57,7 +59,15 @@ export const searchFilterSelector = createSelector(
 export const filteredItemsSelector = createSelector(
   allItemsSelector,
   searchFilterSelector,
-  (allItems, searchFilter) => allItems.filter((i) => searchFilter(i))
+  displayableBucketHashesSelector,
+  (allItems, searchFilter, displayableBuckets) =>
+    allItems.filter((i) => displayableBuckets.has(i.location.hash) && searchFilter(i))
+);
+
+/** A selector for a function for searching items, given the current search query. */
+export const validateQuerySelector = createSelector(
+  searchConfigSelector,
+  (searchConfig) => (query: string) => parseAndValidateQuery(query, searchConfig)
 );
 
 function makeSearchFilterFactory(
@@ -139,6 +149,7 @@ function makeSearchFilterFactory(
             try {
               return filterDef.filter({ filterValue, ...filterContext });
             } catch (e) {
+              // TODO: mark invalid - fill out what didn't make sense and where it was in the string
               errorLog('search', 'Invalid query term', filterName, filterValue, e);
               return () => true;
             }

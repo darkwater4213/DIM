@@ -3,13 +3,14 @@ import { destinyVersionSelector } from 'app/accounts/selectors';
 import { currentProfileSelector } from 'app/dim-api/selectors';
 import { d2ManifestSelector } from 'app/manifest/selectors';
 import { RootState } from 'app/store/types';
-import { emptyObject } from 'app/utils/empty';
+import { emptyObject, emptySet } from 'app/utils/empty';
 import { ItemCategoryHashes } from 'data/d2/generated-enums';
 import { createSelector } from 'reselect';
 import { getBuckets as getBucketsD1 } from '../destiny1/d1-buckets';
 import { getBuckets as getBucketsD2 } from '../destiny2/d2-buckets';
-import { characterSortSelector } from '../settings/character-sort';
-import { ItemInfos } from './dim-item-info';
+import { characterSortImportanceSelector, characterSortSelector } from '../settings/character-sort';
+import { getTag, ItemInfos } from './dim-item-info';
+import { DimItem } from './item-types';
 import { collectNotesHashtags } from './note-hashtags';
 import { getCurrentStore, getVault } from './stores-helpers';
 
@@ -26,11 +27,29 @@ export const bucketsSelector = createSelector(
       : d1Manifest && getBucketsD1(d1Manifest)
 );
 
+/** Bucket hashes for buckets that we actually show on the inventory page. */
+export const displayableBucketHashesSelector = createSelector(bucketsSelector, (buckets) =>
+  buckets
+    ? new Set(
+        Object.keys(buckets.byCategory).flatMap((category) =>
+          buckets.byCategory[category].map((b) => b.hash)
+        )
+      )
+    : emptySet<number>()
+);
+
 /** All stores, sorted according to user preference. */
 export const sortedStoresSelector = createSelector(
   storesSelector,
   characterSortSelector,
   (stores, sortStores) => sortStores(stores)
+);
+
+/** Sorted by "importance" which handles reversed sorting a bit better - for menus only */
+export const storesSortedByImportanceSelector = createSelector(
+  characterSortImportanceSelector,
+  storesSelector,
+  (sort, stores) => sort(stores)
 );
 
 /**
@@ -49,8 +68,23 @@ export const currentStoreSelector = (state: RootState) => getCurrentStore(stores
 /** The vault */
 export const vaultSelector = (state: RootState) => getVault(storesSelector(state));
 
+/** The inventoryItemIds of all items that are "new". */
+export const newItemsSelector = (state: RootState) => state.inventory.newItems;
+
+const visibleCurrencies = [
+  3159615086, // Glimmer
+  1022552290, // Legendary Shards
+  2817410917, // Bright Dust
+  3147280338, // Silver
+  2534352370, // Legendary Marks (D1)
+  2749350776, // Silver (D1)
+];
+
 /** Account wide currencies */
-export const currenciesSelector = (state: RootState) => state.inventory.currencies;
+export const currenciesSelector = createSelector(
+  (state: RootState) => state.inventory.currencies,
+  (currencies) => currencies.filter((c) => visibleCurrencies.includes(c.itemHash))
+);
 
 /** materials/currencies that aren't top level stuff */
 export const materialsSelector = (state: RootState) =>
@@ -116,6 +150,10 @@ export const itemInfosSelector = (state: RootState): ItemInfos =>
  */
 export const itemHashTagsSelector = (state: RootState): { [itemHash: string]: ItemHashTag } =>
   state.dimApi.itemHashTags;
+
+/** Get a specific item's tag */
+export const tagSelector = (item: DimItem) => (state: RootState) =>
+  getTag(item, itemInfosSelector(state), itemHashTagsSelector(state));
 
 /**
  * all hashtags used in existing item notes, with (case-insensitive) dupes removed

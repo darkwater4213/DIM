@@ -1,3 +1,4 @@
+import { D2ManifestDefinitions } from 'app/destiny2/d2-definitions';
 import ShowPageLoading from 'app/dim-ui/ShowPageLoading';
 import { t } from 'app/i18next-t';
 import { useLoadStores } from 'app/inventory/store/hooks';
@@ -6,16 +7,14 @@ import { d2ManifestSelector } from 'app/manifest/selectors';
 import ErrorPanel from 'app/shell/ErrorPanel';
 import { RootState, ThunkDispatchProp } from 'app/store/types';
 import { useEventBusListener } from 'app/utils/hooks';
-import { DestinyProfileResponse } from 'bungie-api-ts/destiny2';
+import { DestinyCollectibleComponent, DestinyProfileResponse } from 'bungie-api-ts/destiny2';
 import clsx from 'clsx';
 import React, { useCallback, useEffect } from 'react';
 import { connect } from 'react-redux';
 import { useLocation } from 'react-router';
 import { DestinyAccount } from '../accounts/destiny-account';
-import { D2ManifestDefinitions } from '../destiny2/d2-definitions';
 import Countdown from '../dim-ui/Countdown';
 import ErrorBoundary from '../dim-ui/ErrorBoundary';
-import { mergeCollectibles } from '../inventory/d2-stores';
 import { InventoryBuckets } from '../inventory/inventory-buckets';
 import {
   bucketsSelector,
@@ -29,6 +28,7 @@ import { refresh$ } from '../shell/refresh';
 import { loadAllVendors } from './actions';
 import { toVendor } from './d2-vendors';
 import type { VendorsState } from './reducer';
+import { mergedCollectiblesSelector, vendorsByCharacterSelector } from './selectors';
 import styles from './SingleVendor.m.scss';
 import { VendorLocation } from './Vendor';
 import VendorItems from './VendorItems';
@@ -40,11 +40,14 @@ interface ProvidedProps {
 
 interface StoreProps {
   stores: DimStore[];
-  defs?: D2ManifestDefinitions;
   buckets?: InventoryBuckets;
   ownedItemHashes: Set<number>;
   profileResponse?: DestinyProfileResponse;
   vendors: VendorsState['vendorsByCharacter'];
+  defs?: D2ManifestDefinitions;
+  mergedCollectibles: {
+    [x: number]: DestinyCollectibleComponent;
+  };
 }
 
 function mapStateToProps() {
@@ -53,9 +56,10 @@ function mapStateToProps() {
     stores: storesSelector(state),
     ownedItemHashes: ownedItemSelectorInstance(state),
     buckets: bucketsSelector(state),
-    defs: d2ManifestSelector(state),
     profileResponse: profileResponseSelector(state),
-    vendors: state.vendors.vendorsByCharacter,
+    vendors: vendorsByCharacterSelector(state),
+    defs: d2ManifestSelector(state),
+    mergedCollectibles: mergedCollectiblesSelector(state),
   });
 }
 
@@ -69,11 +73,12 @@ function SingleVendor({
   stores,
   buckets,
   ownedItemHashes,
-  defs,
   profileResponse,
   vendorHash,
   dispatch,
   vendors,
+  defs,
+  mergedCollectibles,
 }: Props) {
   const { search } = useLocation();
 
@@ -146,16 +151,13 @@ function SingleVendor({
     .join(', ');
   // TODO: there's a cool background image but I'm not sure how to use it
 
-  const mergedCollectibles = profileResponse
-    ? mergeCollectibles(profileResponse.profileCollectibles, profileResponse.characterCollectibles)
-    : {};
-
   const d2Vendor = toVendor(
     vendorHash,
     defs,
     buckets,
     vendor,
     account,
+    characterId,
     vendorResponse?.itemComponents[vendorHash],
     vendorResponse?.sales.data?.[vendorHash]?.saleItems,
     mergedCollectibles
@@ -167,6 +169,7 @@ function SingleVendor({
 
   let displayName = d2Vendor.def.displayProperties.name;
   let displayDesc = d2Vendor.def.displayProperties.description;
+  let artifactCheck: string | undefined;
 
   // if this vendor is the seasonal artifact
   if (vendorDef.displayCategories.find((c) => c.identifier === 'category_reset')) {
@@ -179,11 +182,12 @@ function SingleVendor({
     if (artifactDisplay) {
       displayName = artifactDisplay.name;
       displayDesc = artifactDisplay.description;
+      artifactCheck = 'seasonalArtifact';
     }
   }
 
   return (
-    <div className={clsx(styles.page, 'dim-page')}>
+    <div className={clsx(styles.page, 'dim-page', artifactCheck)}>
       <ErrorBoundary name="SingleVendor">
         <div className={styles.featuredHeader}>
           <h1>

@@ -1,28 +1,37 @@
+import {
+  defaultLoadoutParameters,
+  LoadoutParameters,
+  UpgradeSpendTier,
+} from '@destinyitemmanager/dim-api-types';
+import { D2ManifestDefinitions } from 'app/destiny2/d2-definitions';
 import { t } from 'app/i18next-t';
-import { PluggableInventoryItemDefinition } from 'app/inventory/item-types';
+import { DimItem, PluggableInventoryItemDefinition } from 'app/inventory/item-types';
 import { DimStore } from 'app/inventory/store-types';
 import { getCurrentStore, getItemAcrossStores } from 'app/inventory/stores-helpers';
 import { Loadout } from 'app/loadout-drawer/loadout-types';
 import { showNotification } from 'app/notifications/notifications';
 import { armor2PlugCategoryHashesByName } from 'app/search/d2-known-values';
+import { DestinyClass } from 'bungie-api-ts/destiny2';
+import _ from 'lodash';
 import { useReducer } from 'react';
-import { isArmor2WithStats } from '../loadout/item-utils';
+import { isLoadoutBuilderItem } from '../loadout/item-utils';
 import {
-  ArmorSet,
-  LockedExotic,
-  LockedItemType,
-  LockedMap,
-  MinMaxIgnored,
-  StatTypes,
-} from './types';
-import { addLockedItem, removeLockedItem } from './utils';
+  lockedModsFromLoadoutParameters,
+  statFiltersFromLoadoutParamaters,
+  statOrderFromLoadoutParameters,
+} from './loadout-params';
+import { ArmorSet, ArmorStatHashes, ExcludedItems, PinnedItems, StatFilters } from './types';
 
 export interface LoadoutBuilderState {
-  lockedMap: LockedMap;
+  statOrder: ArmorStatHashes[]; // stat hashes, including disabled stats
+  upgradeSpendTier: UpgradeSpendTier;
+  lockItemEnergyType: boolean;
+  pinnedItems: PinnedItems;
+  excludedItems: ExcludedItems;
   lockedMods: PluggableInventoryItemDefinition[];
-  lockedExotic?: LockedExotic;
+  lockedExoticHash?: number;
   selectedStoreId?: string;
-  statFilters: Readonly<{ [statType in StatTypes]: MinMaxIgnored }>;
+  statFilters: Readonly<StatFilters>;
   modPicker: {
     open: boolean;
     initialQuery?: string;
@@ -33,44 +42,61 @@ export interface LoadoutBuilderState {
 const lbStateInit = ({
   stores,
   preloadedLoadout,
+  initialLoadoutParameters,
+  classType,
+  defs,
 }: {
   stores: DimStore[];
   preloadedLoadout?: Loadout;
+  initialLoadoutParameters: LoadoutParameters;
+  classType: DestinyClass | undefined;
+  defs: D2ManifestDefinitions;
 }): LoadoutBuilderState => {
-  let lockedMap: LockedMap = {};
+  const pinnedItems: PinnedItems = {};
 
-  let selectedStoreId = getCurrentStore(stores)?.id;
+  let selectedStoreId =
+    classType !== undefined
+      ? stores.find((store) => store.classType === classType)?.id
+      : getCurrentStore(stores)?.id;
+
+  let loadoutParams = initialLoadoutParameters;
 
   if (stores.length && preloadedLoadout) {
     selectedStoreId = stores.find((store) => store.classType === preloadedLoadout.classType)?.id;
 
+    // TODO: instead of locking items, show the loadout fixed at the top to compare against and leave all items free
     for (const loadoutItem of preloadedLoadout.items) {
       if (loadoutItem.equipped) {
         const item = getItemAcrossStores(stores, loadoutItem);
-        if (item && isArmor2WithStats(item)) {
-          lockedMap = {
-            ...lockedMap,
-            [item.bucket.hash]: addLockedItem(
-              { type: 'item', item, bucket: item.bucket },
-              lockedMap[item.bucket.hash]
-            ),
-          };
+        if (item && isLoadoutBuilderItem(item)) {
+          pinnedItems[item.bucket.hash] = item;
         }
       }
     }
+
+    // Load all parameters from the loadout if we can
+    if (preloadedLoadout.parameters) {
+      loadoutParams = { ...defaultLoadoutParameters, ...preloadedLoadout.parameters };
+    }
   }
+
+  const statOrder = statOrderFromLoadoutParameters(loadoutParams);
+  const statFilters = statFiltersFromLoadoutParamaters(loadoutParams);
+  const lockedMods = lockedModsFromLoadoutParameters(loadoutParams, defs);
+  const lockItemEnergyType = Boolean(loadoutParams?.lockItemEnergyType);
+  const upgradeSpendTier = loadoutParams.upgradeSpendTier!;
+  const lockedExoticHash = loadoutParams.exoticArmorHash;
+
   return {
-    lockedMap,
-    statFilters: {
-      Mobility: { min: 0, max: 10, ignored: false },
-      Resilience: { min: 0, max: 10, ignored: false },
-      Recovery: { min: 0, max: 10, ignored: false },
-      Discipline: { min: 0, max: 10, ignored: false },
-      Intellect: { min: 0, max: 10, ignored: false },
-      Strength: { min: 0, max: 10, ignored: false },
-    },
-    lockedMods: [],
-    selectedStoreId: selectedStoreId,
+    lockItemEnergyType,
+    upgradeSpendTier,
+    statOrder,
+    pinnedItems,
+    excludedItems: [],
+    statFilters,
+    lockedMods,
+    lockedExoticHash,
+    selectedStoreId,
     modPicker: {
       open: false,
     },
@@ -80,16 +106,24 @@ const lbStateInit = ({
 export type LoadoutBuilderAction =
   | { type: 'changeCharacter'; storeId: string }
   | { type: 'statFiltersChanged'; statFilters: LoadoutBuilderState['statFilters'] }
-  | { type: 'lockedMapChanged'; lockedMap: LockedMap }
-  | { type: 'addItemToLockedMap'; item: LockedItemType }
-  | { type: 'removeItemFromLockedMap'; item: LockedItemType }
+  | { type: 'sortOrderChanged'; sortOrder: LoadoutBuilderState['statOrder'] }
+  | {
+      type: 'lockItemEnergyTypeChanged';
+      lockItemEnergyType: LoadoutBuilderState['lockItemEnergyType'];
+    }
+  | { type: 'upgradeSpendTierChanged'; upgradeSpendTier: LoadoutBuilderState['upgradeSpendTier'] }
+  | { type: 'pinItem'; item: DimItem }
+  | { type: 'setPinnedItems'; items: DimItem[] }
+  | { type: 'unpinItem'; item: DimItem }
+  | { type: 'excludeItem'; item: DimItem }
+  | { type: 'unexcludeItem'; item: DimItem }
   | {
       type: 'lockedModsChanged';
       lockedMods: PluggableInventoryItemDefinition[];
     }
   | { type: 'removeLockedMod'; mod: PluggableInventoryItemDefinition }
   | { type: 'addGeneralMods'; mods: PluggableInventoryItemDefinition[] }
-  | { type: 'lockExotic'; lockedExotic: LockedExotic }
+  | { type: 'lockExotic'; lockedExoticHash: number }
   | { type: 'removeLockedExotic' }
   | { type: 'openModPicker'; initialQuery?: string }
   | { type: 'closeModPicker' }
@@ -106,40 +140,72 @@ function lbStateReducer(
       return {
         ...state,
         selectedStoreId: action.storeId,
-        lockedMap: {},
-        lockedExotic: undefined,
-        statFilters: {
-          Mobility: { min: 0, max: 10, ignored: false },
-          Resilience: { min: 0, max: 10, ignored: false },
-          Recovery: { min: 0, max: 10, ignored: false },
-          Discipline: { min: 0, max: 10, ignored: false },
-          Intellect: { min: 0, max: 10, ignored: false },
-          Strength: { min: 0, max: 10, ignored: false },
-        },
+        pinnedItems: {},
+        excludedItems: {},
+        lockedExoticHash: undefined,
       };
     case 'statFiltersChanged':
       return { ...state, statFilters: action.statFilters };
-    case 'lockedMapChanged':
-      return { ...state, lockedMap: action.lockedMap };
-    case 'addItemToLockedMap': {
+    case 'pinItem': {
       const { item } = action;
       const bucketHash = item.bucket.hash;
       return {
         ...state,
-        lockedMap: {
-          ...state.lockedMap,
-          [bucketHash]: addLockedItem(item, state.lockedMap[bucketHash]),
+        // Remove any previously locked item in that bucket and add this one
+        pinnedItems: {
+          ...state.pinnedItems,
+          [bucketHash]: item,
+        },
+        // Locking an item clears excluded items in this bucket
+        excludedItems: {
+          ...state.excludedItems,
+          [bucketHash]: undefined,
         },
       };
     }
-    case 'removeItemFromLockedMap': {
+    case 'setPinnedItems': {
+      const { items } = action;
+      return {
+        ...state,
+        pinnedItems: _.keyBy(items, (i) => i.bucket.hash),
+        excludedItems: {},
+      };
+    }
+    case 'unpinItem': {
       const { item } = action;
       const bucketHash = item.bucket.hash;
       return {
         ...state,
-        lockedMap: {
-          ...state.lockedMap,
-          [bucketHash]: removeLockedItem(item, state.lockedMap[bucketHash]),
+        pinnedItems: {
+          ...state.pinnedItems,
+          [bucketHash]: undefined,
+        },
+      };
+    }
+    case 'excludeItem': {
+      const { item } = action;
+      const bucketHash = item.bucket.hash;
+      if (state.excludedItems[bucketHash]?.some((i) => i.id === item.id)) {
+        return state; // item's already there
+      }
+      const existingExcluded = state.excludedItems[bucketHash] ?? [];
+      return {
+        ...state,
+        excludedItems: {
+          ...state.excludedItems,
+          [bucketHash]: [...existingExcluded, item],
+        },
+      };
+    }
+    case 'unexcludeItem': {
+      const { item } = action;
+      const bucketHash = item.bucket.hash;
+      const newExcluded = (state.excludedItems[bucketHash] ?? []).filter((i) => i.id !== item.id);
+      return {
+        ...state,
+        excludedItems: {
+          ...state.excludedItems,
+          [bucketHash]: newExcluded.length > 0 ? newExcluded : undefined,
         },
       };
     }
@@ -147,6 +213,24 @@ function lbStateReducer(
       return {
         ...state,
         lockedMods: action.lockedMods,
+      };
+    }
+    case 'sortOrderChanged': {
+      return {
+        ...state,
+        statOrder: action.sortOrder,
+      };
+    }
+    case 'lockItemEnergyTypeChanged': {
+      return {
+        ...state,
+        lockItemEnergyType: action.lockItemEnergyType,
+      };
+    }
+    case 'upgradeSpendTierChanged': {
+      return {
+        ...state,
+        upgradeSpendTier: action.upgradeSpendTier,
       };
     }
     case 'addGeneralMods': {
@@ -190,11 +274,11 @@ function lbStateReducer(
       };
     }
     case 'lockExotic': {
-      const { lockedExotic } = action;
-      return { ...state, lockedExotic };
+      const { lockedExoticHash } = action;
+      return { ...state, lockedExoticHash };
     }
     case 'removeLockedExotic': {
-      return { ...state, lockedExotic: undefined };
+      return { ...state, lockedExoticHash: undefined };
     }
     case 'openModPicker':
       return {
@@ -213,6 +297,16 @@ function lbStateReducer(
   }
 }
 
-export function useLbState(stores: DimStore[], preloadedLoadout?: Loadout) {
-  return useReducer(lbStateReducer, { stores, preloadedLoadout }, lbStateInit);
+export function useLbState(
+  stores: DimStore[],
+  preloadedLoadout: Loadout | undefined,
+  classType: DestinyClass | undefined,
+  initialLoadoutParameters: LoadoutParameters,
+  defs: D2ManifestDefinitions
+) {
+  return useReducer(
+    lbStateReducer,
+    { stores, preloadedLoadout, initialLoadoutParameters, defs, classType },
+    lbStateInit
+  );
 }

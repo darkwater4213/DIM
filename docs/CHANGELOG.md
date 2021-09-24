@@ -1,5 +1,125 @@
 ## Next
 
+* Items in the Compare view no longer move around according to the character they're on.
+
+## 6.83.0 <span class="changelog-date">(2021-09-19)</span>
+
+* Still adjusting to Stasis... `is:kineticslot` now identifies items which are in the "Kinetic" slot (the top weapon slot) but aren't Kinetic type damage.
+* Loadout Optimizer finds better mod assignments.
+* Engram power level is now also shown on hover.
+* Clicking on the title of an item now brings up a new item detail page which shows all possible perks and wishlist rolls.
+* Note that D1 items no longer have a link at all. We're not adding D1 features anymore.
+* Random-roll items in Collections now show all the perk possibilities they could roll with.
+* Armor in Collections now shows what mod slots it has.
+* Fixed vendor items showing some incorrect wishlist matches.
+
+### Beta Only
+
+* Removed the press-and-hold mobile item menu, which saw very limited use. This will also be removed in the release version after some time.
+* Removed the "Active Mode" experiment - its ideas will come back in the future in other forms, but for now it doesn't offer enough above the Progress page (which can be opened in another tab/window next to Inventory if you want to see both).
+
+## 6.82.0 <span class="changelog-date">(2021-09-12)</span>
+
+* Loadout Optimizer remembers stats you've Ignored between sessions.
+* Opening a saved loadout in Loadout Optimizer restores all the mods and other settings from when it was originally created.
+* Share your Loadout Optimizer build - the new share button copies a link to all your build settings. Share great mod combos with other DIM users!
+* Fixed issue in Loadout Optimizer where locking energy type didn't work for slot specific mods.
+* Clicking on an item's picture in the Compare tool now opens the full item popup.
+* Added a "pull" button (down-arrow) to each item in the Compare tool that will pull the item to your current character.
+* Collapsed the Tag menu into an icon in Compare to allow more items to fit on screen.
+* Shortened the names of stats in Compare to allow more items to fit on screen.
+* Added hover titles to the new compare buttons for more clarity.
+* Selecting "Add Unequipped" in the loadout editor no longer tries to equip all your unequipped items.
+* Progress win streak will now correctly display when a user hits a 5 win streak.
+* Fixed broken description for some new triumphs.
+* Loadout Optimizer's exotic picker now consistently orders slots.
+* Loadout Optimizer's stat filters no longer attempt to automatically limit to possible ranges.
+* Added numerical faction ranks alongside rank names on the Progress page.
+* Fixed the order of items in vendors and seasonal vendor upgrade grids.
+* Seasonal artifact display now matches the games display.
+* Ritual rank progress for vendors now matches the ritual rank circle shape.
+* Fixed vendor ranks being off by 1.
+* Accounts list shows your Bungie Name.
+* Add a tip for how to scroll Compare on iOS.
+
+## 6.81.0 <span class="changelog-date">(2021-09-05)</span>
+
+* Fixed wonky rank display in the phone portrait layout.
+* Elemental Capacitor stats are no longer added to weapons with the perk enabled.
+* In the Loadout Optimizer, searching items now works in conjunction with locking exotics and items.
+* Added `is:currentclass` filter, which selects items currently equippable on the logged in guardian.
+* Fixed armor swaps away from Stasis in Loadout Optimizer.
+* Added a warning indicator to previously created loadouts that are now missing items.
+
+## 6.80.0 <span class="changelog-date">(2021-08-29)</span>
+
+* Fix sorting by power and energy in Compare when "Show Base Stats" is enabled.
+* Fixed misalignment in stat rows, and vertical scrolling, in Compare.
+* Highlighting stats in Compare is faster.
+* You can click any perk in Compare, not just the first couple.
+* Clicking an item's name to find it in the inventory view will now change character on mobile to wherever the item is.
+* In Compare for D1, fixed an issue where you could only see the first 2 perk options.
+* Mods can be saved and viewed in Loadouts - this is automatic for loadouts created by Loadout Optimizer but you can edit the mods directly in the loadout editor.
+* Search results can be shown in their own popup sheet now (this shows by default on mobile)
+* There is now a helpful banner prompt to install the app on mobile.
+* When the postmaster is near full, a banner will warn you even if you're not on the inventory screen.
+* Artifact XP progress is now displayed for the correct season.
+* Rearranged the search buttons so the menu icon never moves.
+* Ranks for Vanguard and Trials are now shown in the Progress page.
+* Changed the icons in the Vendors menu.
+* Added Parallax Trajectory to the currencies hover menu.
+
+## 6.79.1 <span class="changelog-date">(2021-08-25)</span>
+
+* Legacy mods are no longer selectable in the Loadout Optimizer.
+
+## 6.79.0 <span class="changelog-date">(2021-08-22)</span>
+
+## 6.78.0 <span class="changelog-date">(2021-08-15)</span>
+
+* Armor in the Organizer no longer displays the now-standard Combat Mod Slot
+
+## 6.77.0 <span class="changelog-date">(2021-08-08)</span>
+
+* Timelost weapons now include their additional Level 10 Masterwork stats.
+
+## 6.76.0 <span class="changelog-date">(2021-08-01)</span>
+
+* Legendary Marks and Silver once again appear in the D1 inventory view.
+* Tap/hover the Artifact power level in the header, to check XP progress towards the next level.
+* When you install DIM on your desktop or home screen, it will now be badged with the number of postmaster items on the current character. You can disable this from Settings. This won't work on iOS.
+
+## 6.75.0 <span class="changelog-date">(2021-07-25)</span>
+
+* When opening Compare for a Timelost weapon, we now also include non-Timelost versions of that weapon.
+* Display the energy swap or upgrade details for items in the Optimiser.
+* Optimiser is now better at matching a set to an existing loadout.
+* Compare will properly close (and not just become invisible) if all the items you're comparing are deleted.
+* Fixed the search actions (three dots) menu not appearing in Safari.
+
+## 6.74.0 <span class="changelog-date">(2021-07-18)</span>
+
+* Added the option to lock item element in the Optimizer's armor upgrade menu.
+* Not be broken
+* Fix issue with Optimiser crashing when socket data is not available.
+* Invalid search queries are greyed out, and the save search star is hidden.
+* Favour higher energy and equipped items for grouped items in the Optimizer. This will mainly be noticed by the shown class item.
+* Adding unequipped items to a loadout no longer also adds items from the Postmaster.
+
+### Beta Only
+
+* The Search Results drawer is back in beta, ready for some more feedback. On mobile it shows up whenever you search, on desktop you can either click the icon or hit "Enter" in the search bar. Try clicking on items in the search results drawer - or even dragging them to characters!
+
+## 6.73.0 <span class="changelog-date">(2021-07-11)</span>
+
+* Solstice of Heroes pursuit list now shows the full description of the objectives, not just the checkboxes.
+* Recent searches are now capped at 300 searches, down from 500.
+* Armor synthesis materials are no longer shown in the currencies block under the vault.
+
+## 6.72.1 <span class="changelog-date">(2021-07-06)</span>
+
+* Solstice of Heroes is back and so is the **Solstice of Heroes** section of the **Progress** tab. Check it out and view your progress toward upgrading armor.
+
 ## 6.72.0 <span class="changelog-date">(2021-07-04)</span>
 
 * Fixed issue with locked mod stats not being applied to a compared loadouts in the Optimizer.
@@ -27,7 +147,7 @@
 ## 6.69.0 <span class="changelog-date">(2021-06-20)</span>
 * Added "Recency" Column & Sorting to Loadout Organizer, this allows viewing gear sorted by acquisition date.
 * Added ctrl-click to toggle item selection in Organizer.
-* Fix over-eager prompt to backup data when signing in.
+ * Fix over-eager prompt to backup data when signing in.
 * Viewing artifact details no longer always shows The Gate Lord's Eye.
 * Scrolling to an item tile is now more accurate.
 * Vault of Glass milestone is now more clearly named.

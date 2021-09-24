@@ -1,6 +1,8 @@
+import ClosableContainer from 'app/dim-ui/ClosableContainer';
 import { t } from 'app/i18next-t';
 import ModPicker from 'app/loadout/mod-picker/ModPicker';
-import { manifestSelector } from 'app/manifest/selectors';
+import { useDefinitions } from 'app/manifest/selectors';
+import { AppIcon, faExclamationTriangle } from 'app/shell/icons';
 import { RootState, ThunkDispatchProp } from 'app/store/types';
 import { useEventBusListener } from 'app/utils/hooks';
 import { itemCanBeInLoadout } from 'app/utils/item-utils';
@@ -14,8 +16,6 @@ import { connect } from 'react-redux';
 import { useLocation } from 'react-router';
 import { createSelector } from 'reselect';
 import { v4 as uuidv4 } from 'uuid';
-import { D1ManifestDefinitions } from '../destiny1/d1-definitions';
-import { D2ManifestDefinitions } from '../destiny2/d2-definitions';
 import Sheet from '../dim-ui/Sheet';
 import { InventoryBuckets } from '../inventory/inventory-buckets';
 import InventoryItem from '../inventory/InventoryItem';
@@ -80,7 +80,6 @@ interface StoreProps {
   stores: DimStore[];
   allItems: DimItem[];
   buckets: InventoryBuckets;
-  defs: D1ManifestDefinitions | D2ManifestDefinitions;
   loadouts: Loadout[];
 }
 
@@ -110,7 +109,7 @@ type Action =
   /** Replace the current loadout with an updated one */
   | { type: 'update'; loadout: Loadout }
   /** Add an item to the loadout */
-  | { type: 'addItem'; item: DimItem; shift: boolean; items: DimItem[] }
+  | { type: 'addItem'; item: DimItem; shift: boolean; items: DimItem[]; equip?: boolean }
   /** Remove an item from the loadout */
   | { type: 'removeItem'; item: DimItem; shift: boolean; items: DimItem[] }
   /** Make an item that's already in the loadout equipped */
@@ -152,7 +151,7 @@ function stateReducer(state: State, action: Action): State {
 
     case 'addItem': {
       const { loadout } = state;
-      const { item, shift, items } = action;
+      const { item, shift, items, equip } = action;
 
       if (!itemCanBeInLoadout(item)) {
         showNotification({ type: 'warning', title: t('Loadouts.OnlyItems') });
@@ -161,7 +160,7 @@ function stateReducer(state: State, action: Action): State {
 
       return {
         ...state,
-        loadout: addItem(loadout || newLoadout('', []), item, shift, items),
+        loadout: addItem(loadout || newLoadout('', []), item, shift, items, equip),
         isNew: !loadout,
       };
     }
@@ -206,7 +205,8 @@ function addItem(
   loadout: Readonly<Loadout>,
   item: DimItem,
   shift: boolean,
-  items: DimItem[]
+  items: DimItem[],
+  equip?: boolean
 ): Loadout {
   const loadoutItem: LoadoutItem = {
     id: item.id,
@@ -226,7 +226,8 @@ function addItem(
 
     if (!dupe) {
       if (typeInventory.length < maxSlots) {
-        loadoutItem.equipped = item.equipment && typeInventory.length === 0;
+        loadoutItem.equipped =
+          equip !== undefined ? equip : item.equipment && typeInventory.length === 0;
         if (loadoutItem.equipped) {
           for (const otherItem of typeInventory) {
             findItem(otherItem).equipped = false;
@@ -362,7 +363,6 @@ function mapStateToProps() {
     stores: storesSelector(state),
     allItems: allItemsSelector(state),
     buckets: bucketsSelector(state)!,
-    defs: manifestSelector(state)!,
     loadouts: loadoutsSelector(state),
   });
 }
@@ -377,10 +377,11 @@ function LoadoutDrawer({
   stores,
   allItems,
   itemSortOrder,
-  defs,
   loadouts,
   dispatch,
 }: Props) {
+  const defs = useDefinitions()!;
+
   // All state and the state of the loadout is managed through this reducer
   const [{ loadout, showClass, isNew, modPicker }, stateDispatch] = useReducer(stateReducer, {
     showClass: true,
@@ -415,8 +416,8 @@ function LoadoutDrawer({
   );
 
   const onAddItem = useCallback(
-    (item: DimItem, e?: MouseEvent | React.MouseEvent) =>
-      stateDispatch({ type: 'addItem', item, shift: Boolean(e?.shiftKey), items }),
+    (item: DimItem, e?: MouseEvent | React.MouseEvent, equip?: boolean) =>
+      stateDispatch({ type: 'addItem', item, shift: Boolean(e?.shiftKey), items, equip }),
     [items]
   );
 
@@ -569,7 +570,7 @@ function LoadoutDrawer({
 
   return (
     <Sheet onClose={close} header={header}>
-      <div id="loadout-drawer" className="loadout-create">
+      <div className="loadout-drawer loadout-create">
         <div className="loadout-content">
           <LoadoutDrawerDropTarget
             bucketTypes={bucketTypes}
@@ -578,12 +579,16 @@ function LoadoutDrawer({
           >
             {warnitems.length > 0 && (
               <div className="loadout-contents">
-                <p>{t('Loadouts.VendorsCannotEquip')}</p>
+                <p>
+                  <AppIcon className="warning-icon" icon={faExclamationTriangle} />
+                  {t('Loadouts.VendorsCannotEquip')}
+                </p>
                 <div className="loadout-warn-items">
                   {warnitems.map((item) => (
                     <div key={item.id} className="loadout-item">
-                      <InventoryItem item={item} onClick={() => fixWarnItem(item)} />
-                      <div className="close" onClick={() => onRemoveItem(item)} />
+                      <ClosableContainer onClose={() => onRemoveItem(item)}>
+                        <InventoryItem item={item} onClick={() => fixWarnItem(item)} />
+                      </ClosableContainer>
                     </div>
                   ))}
                 </div>

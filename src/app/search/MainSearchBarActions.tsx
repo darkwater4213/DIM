@@ -1,38 +1,35 @@
 import { t } from 'app/i18next-t';
-import { InventoryBuckets } from 'app/inventory/inventory-buckets';
-import { allItemsSelector, bucketsSelector } from 'app/inventory/selectors';
-import ItemActionsDropdown from 'app/item-actions/ItemActionsDropdown';
-import { isPhonePortraitSelector, querySelector } from 'app/shell/selectors';
+import { toggleSearchResults } from 'app/shell/actions';
+import { AppIcon, faList } from 'app/shell/icons';
+import { querySelector, searchResultsOpenSelector } from 'app/shell/selectors';
 import { RootState, ThunkDispatchProp } from 'app/store/types';
-import { emptyArray, emptySet } from 'app/utils/empty';
-import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import React from 'react';
 import ReactDOM from 'react-dom';
 import { connect } from 'react-redux';
 import { useLocation } from 'react-router';
 import { DimItem } from '../inventory/item-types';
-import { ItemFilter } from './filter-types';
 import styles from './MainSearchBarActions.m.scss';
-import { searchFilterSelector } from './search-filter';
+import { filteredItemsSelector, validateQuerySelector } from './search-filter';
 import './search-filter.scss';
 import SearchResults from './SearchResults';
 
 interface StoreProps {
   searchQuery: string;
-  allItems: DimItem[];
-  buckets?: InventoryBuckets;
-  searchFilter: ItemFilter;
-  isPhonePortrait: boolean;
+  filteredItems: DimItem[];
+  searchResultsOpen: boolean;
+  queryValid: boolean;
 }
 
 type Props = StoreProps & ThunkDispatchProp;
 
 function mapStateToProps(state: RootState): StoreProps {
+  const searchQuery = querySelector(state);
   return {
-    searchQuery: querySelector(state),
-    searchFilter: searchFilterSelector(state),
-    allItems: allItemsSelector(state),
-    buckets: bucketsSelector(state),
-    isPhonePortrait: isPhonePortraitSelector(state),
+    searchQuery,
+    queryValid: validateQuerySelector(state)(searchQuery),
+    filteredItems: filteredItemsSelector(state),
+    searchResultsOpen: searchResultsOpenSelector(state),
   };
 }
 
@@ -40,90 +37,62 @@ function mapStateToProps(state: RootState): StoreProps {
  * The extra buttons that appear in the main search bar when there are matched items.
  */
 function MainSearchBarActions({
-  allItems,
-  buckets,
-  searchFilter,
+  filteredItems,
+  queryValid,
   searchQuery,
-  isPhonePortrait,
+  searchResultsOpen,
+  dispatch,
 }: Props) {
-  // TODO: how to wire "enter" on a closed menu to this?
-  // TODO: default open on mobile
-  const [searchResultsOpen, setSearchResultsOpen] = useState(false);
-
   const location = useLocation();
   const onInventory = location.pathname.endsWith('inventory');
   const onProgress = location.pathname.endsWith('progress');
   const onRecords = location.pathname.endsWith('records');
   const onVendors = location.pathname.endsWith('vendors');
+
   // We don't have access to the selected store so we'd match multiple characters' worth.
   // Just suppress the count for now
-  const showSearchActions = onInventory;
-  const showSearchCount = Boolean(searchQuery && !onProgress && !onRecords && !onVendors);
-
-  const hasQuery = searchQuery.length !== 0;
-  useEffect(() => {
-    if (!$featureFlags.searchResults) {
-      return;
-    }
-    if (!hasQuery && searchResultsOpen) {
-      setSearchResultsOpen(false);
-    } else if (hasQuery && isPhonePortrait) {
-      setSearchResultsOpen(true);
-    }
-  }, [hasQuery, searchResultsOpen, isPhonePortrait]);
-
-  const displayableBuckets = useMemo(
-    () =>
-      buckets
-        ? new Set(
-            Object.keys(buckets.byCategory).flatMap((category) =>
-              buckets.byCategory[category].map((b) => b.hash)
-            )
-          )
-        : emptySet<number>(),
-    [buckets]
-  );
-
-  const filteredItems = useMemo(
-    () =>
-      showSearchCount && displayableBuckets.size
-        ? allItems.filter(
-            (item: DimItem) => displayableBuckets.has(item.bucket.hash) && searchFilter(item)
-          )
-        : emptyArray<DimItem>(),
-    [displayableBuckets, showSearchCount, searchFilter, allItems]
+  const showSearchResults = onInventory;
+  const showSearchCount = Boolean(
+    queryValid && searchQuery && !onProgress && !onRecords && !onVendors
   );
 
   return (
     <>
       {showSearchCount && (
-        <span className={styles.count}>
-          {t('Header.FilterMatchCount', { count: filteredItems.length })}
-        </span>
-      )}
-
-      {$featureFlags.searchResults && showSearchCount && (
-        <button
-          type="button"
-          className={styles.resultButton}
-          onClick={() => setSearchResultsOpen((s) => !s)}
+        <motion.div
+          key="count"
+          layout
+          exit={{ scale: 0 }}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
         >
-          {t('Header.SearchResults')}
-        </button>
+          {showSearchResults ? (
+            <button
+              type="button"
+              className={styles.resultButton}
+              title={t('Header.SearchResults')}
+              onClick={() => dispatch(toggleSearchResults())}
+            >
+              <span className={styles.count}>
+                {t('Header.FilterMatchCount', { count: filteredItems.length })}
+              </span>
+              <AppIcon icon={faList} />
+            </button>
+          ) : (
+            <span className={styles.count}>
+              {t('Header.FilterMatchCount', { count: filteredItems.length })}
+            </span>
+          )}
+        </motion.div>
       )}
 
-      {showSearchActions && (
-        <ItemActionsDropdown
-          filteredItems={filteredItems}
-          searchActive={showSearchCount}
-          searchQuery={searchQuery}
-        />
-      )}
-
-      {$featureFlags.searchResults &&
+      {showSearchResults &&
         searchResultsOpen &&
         ReactDOM.createPortal(
-          <SearchResults items={filteredItems} onClose={() => setSearchResultsOpen(false)} />,
+          <SearchResults
+            items={filteredItems}
+            onClose={() => dispatch(toggleSearchResults(false))}
+          />,
           document.body
         )}
     </>

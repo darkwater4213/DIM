@@ -1,6 +1,6 @@
 @import '../variables.scss';
 
-#loadout-drawer {
+.loadout-drawer {
   max-height: calc(var(--viewport-height) - var(--header-height) - 16px);
   @include phone-portrait {
     @include max-sheet-height;
@@ -51,6 +51,8 @@
 
 .loadout-item {
   position: relative;
+
+  // TODO: uhh gotta deal with this
   .close {
     right: 2px;
   }
@@ -123,6 +125,10 @@
 
     @include horizontal-space-children(4px);
   }
+}
+
+.warning-icon {
+  color: yellow;
 }
 
 .loadout-warn-items {

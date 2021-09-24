@@ -11,17 +11,21 @@ import {
   TagValue,
 } from '@destinyitemmanager/dim-api-types';
 import { DestinyAccount } from 'app/accounts/destiny-account';
+import { recentSearchComparator } from 'app/search/autocomplete';
 import { canonicalizeQuery, parseQuery } from 'app/search/query-parser';
 import { searchConfigSelector } from 'app/search/search-config';
 import { validateQuery } from 'app/search/search-utils';
 import { RootState } from 'app/store/types';
 import { emptyArray } from 'app/utils/empty';
 import { errorLog, infoLog, timer } from 'app/utils/log';
+import { count } from 'app/utils/util';
 import { clearWishLists } from 'app/wishlists/actions';
+import { deepEqual } from 'fast-equals';
 import produce, { Draft } from 'immer';
 import _ from 'lodash';
 import { ActionType, getType } from 'typesafe-actions';
 import * as inventoryActions from '../inventory/actions';
+import { migrateLoadoutParametersFromSettings } from '../loadout-builder/loadout-params';
 import * as loadoutActions from '../loadout-drawer/actions';
 import {
   Loadout as DimLoadout,
@@ -32,6 +36,9 @@ import { initialSettingsState, Settings } from '../settings/initial-settings';
 import { DeleteLoadoutUpdateWithRollback, ProfileUpdateWithRollback } from './api-types';
 import * as actions from './basic-actions';
 import { makeProfileKey, makeProfileKeyFromAccount } from './selectors';
+
+// After you've got a search history of more than this many items, we start deleting the older ones
+const MAX_SEARCH_HISTORY = 300;
 
 export interface DimApiState {
   globalSettings: GlobalSettings;
@@ -174,10 +181,10 @@ export const dimApi = (
         ? {
             ...state,
             profileLoadedFromIndexedDb: true,
-            settings: {
+            settings: migrateLoadoutParametersFromSettings({
               ...state.settings,
               ...action.payload.settings,
-            },
+            }),
             profiles: {
               ...state.profiles,
               ...action.payload.profiles,
@@ -197,15 +204,16 @@ export const dimApi = (
 
     case getType(actions.profileLoaded): {
       const { profileResponse, account } = action.payload;
-      return {
+      // TODO: clean out invalid/simple searches on first load?
+      const newState = {
         ...state,
         profileLoaded: true,
         profileLoadedError: undefined,
         profileLastLoaded: Date.now(),
-        settings: {
+        settings: migrateLoadoutParametersFromSettings({
           ...state.settings,
           ...profileResponse.settings,
-        },
+        }),
         itemHashTags: profileResponse.itemHashTags
           ? _.keyBy(profileResponse.itemHashTags, (t) => t.hash)
           : state.itemHashTags,
@@ -227,6 +235,13 @@ export const dimApi = (
             }
           : state.searches,
       };
+
+      // If this is the first load, cleanup searches
+      if (account && !state.profileLoaded) {
+        return produce(newState, (state) => cleanupInvalidSearches(state, account));
+      }
+
+      return newState;
     }
 
     case getType(actions.profileLoadError): {
@@ -373,6 +388,11 @@ export const dimApi = (
 };
 
 function changeSetting<V extends keyof Settings>(state: DimApiState, prop: V, value: Settings[V]) {
+  // Don't worry about changing settings to their current value
+  if (deepEqual(state.settings[prop], value)) {
+    return state;
+  }
+
   return produce(state, (draft) => {
     const beforeValue = draft.settings[prop];
     draft.settings[prop] = value;
@@ -1012,7 +1032,6 @@ function searchUsed(draft: Draft<DimApiState>, account: DestinyAccount, query: s
     }
     if (ast.op === 'noop' || (ast.op === 'filter' && ast.type === 'keyword')) {
       // don't save "trivial" single-keyword filters
-      // TODO: somehow also reject invalid searches (that don't match real keywords)
       return;
     }
     query = canonicalizeQuery(ast);
@@ -1044,11 +1063,20 @@ function searchUsed(draft: Draft<DimApiState>, account: DestinyAccount, query: s
     });
   }
 
-  // TODO: purge invalid searches
-  // TODO: this is where we would cap the search history!
-  // while (searches.length > MAX_SEARCH_HISTORY) {
-  //   remove bottom-sorted search
-  // }
+  if (searches.length > MAX_SEARCH_HISTORY) {
+    const sortedSearches = [...searches].sort(recentSearchComparator);
+
+    const numBuiltinSearches = count(sortedSearches, (s) => s.usageCount <= 0);
+
+    // remove bottom-sorted search until we get to the limit
+    while (sortedSearches.length > MAX_SEARCH_HISTORY - numBuiltinSearches) {
+      const lastSearch = sortedSearches.pop()!;
+      // Never try to delete the built-in searches or saved searches
+      if (!lastSearch.saved && lastSearch.usageCount > 0) {
+        deleteSearch(draft, destinyVersion, lastSearch.query);
+      }
+    }
+  }
 
   draft.updateQueue.push(updateAction);
 }
@@ -1122,6 +1150,37 @@ function deleteSearch(draft: Draft<DimApiState>, destinyVersion: DestinyVersion,
   draft.searches[destinyVersion] = draft.searches[destinyVersion].filter((s) => s.query !== query);
 
   draft.updateQueue.push(updateAction);
+}
+
+function cleanupInvalidSearches(draft: Draft<DimApiState>, account: DestinyAccount) {
+  // Filter out saved and builtin searches
+  const searches = draft.searches[account.destinyVersion].filter(
+    (s) => !s.saved && s.usageCount > 0
+  );
+
+  if (!searches.length) {
+    return;
+  }
+
+  const searchConfigs = searchConfigSelector(stubSearchRootState(account));
+  for (const search of draft.searches[account.destinyVersion]) {
+    if (search.saved || search.usageCount <= 0) {
+      continue;
+    }
+
+    try {
+      const ast = parseQuery(search.query);
+      if (
+        !validateQuery(ast, searchConfigs) ||
+        ast.op === 'noop' ||
+        (ast.op === 'filter' && ast.type === 'keyword')
+      ) {
+        deleteSearch(draft, account.destinyVersion, search.query);
+      }
+    } catch (e) {
+      deleteSearch(draft, account.destinyVersion, search.query);
+    }
+  }
 }
 
 function reverseEffects(draft: Draft<DimApiState>, update: ProfileUpdateWithRollback) {

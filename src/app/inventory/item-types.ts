@@ -48,7 +48,7 @@ export interface DimItem {
   /** The version of Destiny this comes from. */
   destinyVersion: DestinyVersion;
   /** This is the type of the item (see InventoryBuckets) regardless of location. This string is a DIM concept with no direct correlation to the API types. It should generally be avoided in favor of using bucket hash.  */
-  type: string;
+  type: NonNullable<InventoryBucket['type']>;
   /** Localized name of this item's type. */
   typeName: string;
   /** The bucket the item normally resides in (even though it may currently be elsewhere, such as in the postmaster). */
@@ -59,8 +59,8 @@ export interface DimItem {
   tier: Tier;
   /** Is this an Exotic item? */
   isExotic: boolean;
-  /** Did this come from a vendor instead of character inventory? */
-  isVendorItem: boolean;
+  /** If this came from a vendor (instead of character inventory), this houses enough information to re-identify the item. */
+  vendor?: { vendorHash: number; saleIndex: number; characterId: string };
   /** Localized name of the item. */
   name: string;
   /** Localized description of the item. */
@@ -420,4 +420,5 @@ export interface DimPursuit {
   modifierHashes: number[];
   questStepNum?: number;
   questStepsTotal?: number;
+  questLineDescription?: string;
 }

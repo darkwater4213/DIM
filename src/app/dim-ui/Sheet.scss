@@ -60,10 +60,10 @@ $control-color: rgba(255, 255, 255, 0.5);
   .sheet-contents {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;
     box-sizing: border-box;
-    z-index: 0;
     padding-bottom: env(safe-area-inset-bottom);
 
     &.sheet-has-footer {
@@ -86,6 +86,10 @@ $control-color: rgba(255, 255, 255, 0.5);
     }
     &:active {
       color: rgba(255, 255, 255, 1);
+    }
+
+    &.sheet-no-header {
+      right: 8px;
     }
   }
 }

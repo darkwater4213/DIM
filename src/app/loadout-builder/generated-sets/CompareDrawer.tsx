@@ -1,3 +1,4 @@
+import { LoadoutParameters, UpgradeSpendTier } from '@destinyitemmanager/dim-api-types';
 import { D2ManifestDefinitions } from 'app/destiny2/d2-definitions';
 import Sheet from 'app/dim-ui/Sheet';
 import { t } from 'app/i18next-t';
@@ -8,7 +9,7 @@ import { updateLoadout } from 'app/loadout-drawer/actions';
 import { Loadout, LoadoutItem } from 'app/loadout-drawer/loadout-types';
 import { getModRenderKey } from 'app/loadout/mod-utils';
 import { useD2Definitions } from 'app/manifest/selectors';
-import { UpgradeSpendTier } from 'app/settings/initial-settings';
+import { armorStats } from 'app/search/d2-known-values';
 import { RootState, ThunkDispatchProp } from 'app/store/types';
 import { DestinyClass } from 'bungie-api-ts/destiny2';
 import clsx from 'clsx';
@@ -17,9 +18,9 @@ import _ from 'lodash';
 import React, { useMemo, useState } from 'react';
 import { connect } from 'react-redux';
 import { getItemsFromLoadoutItems } from '../../loadout-drawer/loadout-utils';
-import { assignModsToArmorSet } from '../mod-utils';
+import { getAssignedAndUnassignedMods, getModAssignments } from '../mod-assignments';
 import { getTotalModStatChanges } from '../process/mappers';
-import { ArmorSet, LockableBucketHashes, statHashes, statKeys, StatTypes } from '../types';
+import { ArmorSet, ArmorStats, LockableBucketHashes } from '../types';
 import { getPower, upgradeSpendTierToMaxEnergy } from '../utils';
 import styles from './CompareDrawer.m.scss';
 import Mod from './Mod';
@@ -30,18 +31,18 @@ function getItemStats(
   defs: D2ManifestDefinitions,
   item: DimItem,
   upgradeSpendTier: UpgradeSpendTier
-) {
-  const baseStats = _.mapValues(
-    statHashes,
-    (value) => item.stats?.find((s) => s.statHash === value)?.base || 0
-  );
+): ArmorStats {
+  const baseStats = armorStats.reduce((memo, statHash) => {
+    memo[statHash] = item.stats?.find((s) => s.statHash === statHash)?.base || 0;
+    return memo;
+  }, {}) as ArmorStats;
 
   if (
     upgradeSpendTierToMaxEnergy(defs, upgradeSpendTier, item) === 10 ||
     item.energy?.energyCapacity === 10
   ) {
-    for (const statType of statKeys) {
-      baseStats[statType] += 2;
+    for (const statHash of armorStats) {
+      baseStats[statHash] += 2;
     }
   }
 
@@ -53,9 +54,11 @@ interface ProvidedProps {
   loadouts: Loadout[];
   lockedMods: PluggableInventoryItemDefinition[];
   classType: DestinyClass;
-  statOrder: StatTypes[];
-  enabledStats: Set<StatTypes>;
+  statOrder: number[];
+  enabledStats: Set<number>;
   upgradeSpendTier: UpgradeSpendTier;
+  lockItemEnergyType: boolean;
+  params: LoadoutParameters;
   onClose(): void;
 }
 
@@ -66,18 +69,18 @@ interface StoreProps {
 
 type Props = ProvidedProps & StoreProps & ThunkDispatchProp;
 
-function mapStateToProps() {
-  return (state: RootState): StoreProps => ({
+function mapStateToProps(state: RootState): StoreProps {
+  return {
     allItems: allItemsSelector(state),
     characterClass: currentStoreSelector(state)?.classType,
-  });
+  };
 }
 
 function chooseSimilarLoadout(
   setItems: DimItem[],
   useableLoadouts: Loadout[]
 ): Loadout | undefined {
-  const exotic = setItems.find((i) => i.equippingLabel);
+  const exotic = setItems.find((i) => i.isExotic);
   return (
     (exotic && useableLoadouts.find((l) => l.items.some((i) => i.hash === exotic.hash))) ||
     (useableLoadouts.length ? useableLoadouts[0] : undefined)
@@ -94,6 +97,8 @@ function CompareDrawer({
   statOrder,
   enabledStats,
   upgradeSpendTier,
+  lockItemEnergyType,
+  params,
   onClose,
   dispatch,
 }: Props) {
@@ -120,33 +125,37 @@ function CompareDrawer({
   }
 
   const loadoutMaxPower = _.sumBy(loadoutItems, (i) => i.basePower) / loadoutItems.length;
-  const loadoutStats = _.mapValues(statHashes, () => 0);
+  const loadoutStats = armorStats.reduce((memo, statHash) => {
+    memo[statHash] = 0;
+    return memo;
+  }, {}) as ArmorStats;
 
   for (const item of loadoutItems) {
     const itemStats = getItemStats(defs, item, upgradeSpendTier);
-    for (const statType of statKeys) {
-      loadoutStats[statType] += itemStats[statType];
+    for (const statHash of armorStats) {
+      loadoutStats[statHash] += itemStats[statHash];
     }
   }
 
   const lockedModStats = getTotalModStatChanges(lockedMods, characterClass);
 
-  for (const statType of statKeys) {
-    loadoutStats[statType] += lockedModStats[statType];
+  for (const statHash of armorStats) {
+    loadoutStats[statHash] += lockedModStats[statHash];
   }
 
-  const [assignedMods] = assignModsToArmorSet(
-    defs,
-    set.armor.map((items) => items[0]),
+  const loSetAssignedMods = getModAssignments(
+    setItems,
     lockedMods,
-    upgradeSpendTier
-  );
-
-  const [loadoutAssignedMods, loadoutUnassignedMods] = assignModsToArmorSet(
     defs,
+    upgradeSpendTier,
+    lockItemEnergyType
+  );
+  const [loadoutAssignedMods, loadoutUnassignedMods] = getAssignedAndUnassignedMods(
     loadoutItems,
     lockedMods,
-    upgradeSpendTier
+    defs,
+    upgradeSpendTier,
+    lockItemEnergyType
   );
 
   const onSaveLoadout = (e: React.MouseEvent) => {
@@ -176,6 +185,7 @@ function CompareDrawer({
           }
         }
         draftLoadout.items = newItems;
+        draftLoadout.parameters = params;
       }
     });
 
@@ -222,7 +232,7 @@ function CompareDrawer({
             {setItems.map((item) => (
               <div key={item.bucket.hash} className={styles.item}>
                 <ConnectedInventoryItem item={item} />
-                <Sockets item={item} lockedMods={assignedMods[item.id]} />
+                <Sockets item={item} lockedMods={loSetAssignedMods.get(item.id)} />
               </div>
             ))}
           </div>
@@ -262,7 +272,7 @@ function CompareDrawer({
                     style={{ gridColumn: LockableBucketHashes.indexOf(item.bucket.hash) + 1 }}
                   >
                     <ConnectedInventoryItem item={item} />
-                    <Sockets item={item} lockedMods={loadoutAssignedMods[item.id]} />
+                    <Sockets item={item} lockedMods={loadoutAssignedMods.get(item.id)} />
                   </div>
                 ))}
               </div>

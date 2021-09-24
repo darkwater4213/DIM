@@ -6,10 +6,13 @@ import { Loading } from 'app/dim-ui/Loading';
 import Sheet from 'app/dim-ui/Sheet';
 import UserGuideLink from 'app/dim-ui/UserGuideLink';
 import { t } from 'app/i18next-t';
-import { isPhonePortraitSelector } from 'app/shell/selectors';
+import { toggleSearchResults } from 'app/shell/actions';
+import { useIsPhonePortrait } from 'app/shell/selectors';
 import { RootState, ThunkDispatchProp } from 'app/store/types';
+import { isiOSBrowser } from 'app/utils/browsers';
 import clsx from 'clsx';
 import { useCombobox, UseComboboxState, UseComboboxStateChangeOptions } from 'downshift';
+import { AnimatePresence, AnimateSharedLayout, motion } from 'framer-motion';
 import _ from 'lodash';
 import React, {
   Suspense,
@@ -41,6 +44,7 @@ import createAutocompleter, { SearchItem, SearchItemType } from './autocomplete'
 import HighlightedText from './HighlightedText';
 import { canonicalizeQuery, parseQuery } from './query-parser';
 import { searchConfigSelector } from './search-config';
+import { validateQuerySelector } from './search-filter';
 import './search-filter.scss';
 import styles from './SearchBar.m.scss';
 
@@ -57,14 +61,14 @@ interface ProvidedProps {
   placeholder: string;
   /** Is this the main search bar in the header? It behaves somewhat differently. */
   mainSearchBar?: boolean;
-  /** Whether to autofocus this on mount */
-  autoFocus?: boolean;
   /** A fake property that can be used to force the "live" query to be replaced with the one from props */
   searchQueryVersion?: number;
   /** The search query to fill in the input. This is used only initially, or when searchQueryVersion changes */
   searchQuery?: string;
   /** Children are used as optional extra action buttons only when there is a query. */
   children?: React.ReactChild;
+  /** An optional menu of actions that can be executed on the search. Always shown. */
+  menu?: React.ReactChild;
   /** Fired whenever the query changes (already debounced) */
   onQueryChanged(query: string): void;
   /** Fired whenever the query has been cleared */
@@ -73,7 +77,7 @@ interface ProvidedProps {
 
 interface StoreProps {
   recentSearches: Search[];
-  isPhonePortrait: boolean;
+  validateQuery: (query: string) => boolean;
   autocompleter: (query: string, caretIndex: number, recentSearches: Search[]) => SearchItem[];
 }
 
@@ -100,8 +104,8 @@ function mapStateToProps() {
 
     return {
       recentSearches: recentSearchesSelector(state),
-      isPhonePortrait: isPhonePortraitSelector(state),
       autocompleter: autoCompleterSelector(state),
+      validateQuery: validateQuerySelector(state),
       searchQuery: manipulatedSearchQuery,
     };
   };
@@ -184,16 +188,21 @@ function SearchBar(
     mainSearchBar,
     placeholder,
     children,
-    autoFocus,
     onQueryChanged,
     onClear,
     dispatch,
+    validateQuery,
     autocompleter,
     recentSearches,
-    isPhonePortrait,
+    menu,
   }: Props,
   ref: React.Ref<SearchFilterRef>
 ) {
+  const isPhonePortrait = useIsPhonePortrait();
+
+  // On iOS at least, focusing the keyboard pushes the content off the screen
+  const autoFocus = !mainSearchBar && !isPhonePortrait && !isiOSBrowser();
+
   const [liveQuery, setLiveQuery] = useState('');
   const [filterHelpOpen, setFilterHelpOpen] = useState(false);
   const inputElement = useRef<HTMLInputElement>(null);
@@ -206,9 +215,11 @@ function SearchBar(
     [onQueryChanged]
   );
 
+  const valid = validateQuery(liveQuery);
+
   const lastBlurQuery = useRef<string>();
   const onBlur = () => {
-    if (liveQuery && liveQuery !== lastBlurQuery.current) {
+    if (valid && liveQuery && liveQuery !== lastBlurQuery.current) {
       // save this to the recent searches only on blur
       // we use the ref to only fire if the query changed since the last blur
       dispatch(searchUsed(liveQuery));
@@ -246,7 +257,7 @@ function SearchBar(
     highlightedIndex,
     getItemProps,
     setInputValue,
-    reset,
+    reset: clearFilter,
     openMenu,
   } = useCombobox<SearchItem>({
     items,
@@ -254,9 +265,15 @@ function SearchBar(
     initialIsOpen: isPhonePortrait && mainSearchBar,
     defaultHighlightedIndex: liveQuery ? 0 : -1,
     itemToString: (i) => i?.query || '',
-    onInputValueChange: ({ inputValue }) => {
+    onInputValueChange: ({ inputValue, type }) => {
       setLiveQuery(inputValue || '');
       debouncedUpdateQuery(inputValue || '');
+      if (type !== useCombobox.stateChangeTypes.InputChange) {
+        debouncedUpdateQuery.flush();
+      }
+      if (type === useCombobox.stateChangeTypes.FunctionReset) {
+        onClear?.();
+      }
     },
   });
 
@@ -291,12 +308,6 @@ function SearchBar(
       openMenu();
     }
   };
-
-  const clearFilter = useCallback(() => {
-    debouncedUpdateQuery('');
-    reset();
-    onClear?.();
-  }, [onClear, reset, debouncedUpdateQuery]);
 
   // Reset live query when search version changes
   useEffect(() => {
@@ -364,6 +375,9 @@ function SearchBar(
     ) {
       e.preventDefault();
       dispatch(searchDeleted(items[highlightedIndex].query));
+    } else if (e.key === 'Enter' && !isOpen && liveQuery) {
+      // Show search results on "Enter" with a closed menu
+      dispatch(toggleSearchResults());
     }
   };
 
@@ -381,7 +395,7 @@ function SearchBar(
           onFocus,
           onKeyDown,
           ref: inputElement,
-          className: 'filter-input',
+          className: clsx('filter-input', { [styles.invalid]: !valid }),
           autoComplete: 'off',
           autoCorrect: 'off',
           autoCapitalize: 'off',
@@ -392,39 +406,56 @@ function SearchBar(
           name: 'filter',
         })}
       />
+      <AnimateSharedLayout>
+        <AnimatePresence>
+          {children}
 
-      {children}
+          {liveQuery.length > 0 && valid && (
+            <motion.button
+              layout
+              exit={{ scale: 0 }}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              key="save"
+              type="button"
+              className={clsx('filter-bar-button', styles.saveSearchButton)}
+              onClick={toggleSaved}
+              title={t('Header.SaveSearch')}
+            >
+              <AppIcon icon={saved ? starIcon : starOutlineIcon} />
+            </motion.button>
+          )}
 
-      {liveQuery.length > 0 && (
-        <button
-          type="button"
-          className={clsx('filter-bar-button', styles.saveSearchButton)}
-          onClick={toggleSaved}
-          title={t('Header.SaveSearch')}
-        >
-          <AppIcon icon={saved ? starIcon : starOutlineIcon} />
-        </button>
-      )}
+          {(liveQuery.length > 0 || (isPhonePortrait && mainSearchBar)) && (
+            <motion.button
+              layout
+              exit={{ scale: 0 }}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              key="clear"
+              type="button"
+              className="filter-bar-button"
+              onClick={clearFilter}
+              title={t('Header.Clear')}
+            >
+              <AppIcon icon={disabledIcon} />
+            </motion.button>
+          )}
 
-      {(liveQuery.length > 0 || (isPhonePortrait && mainSearchBar)) && (
-        <button
-          type="button"
-          className="filter-bar-button"
-          onClick={clearFilter}
-          title={t('Header.Clear')}
-        >
-          <AppIcon icon={disabledIcon} />
-        </button>
-      )}
+          {menu}
 
-      <button
-        type="button"
-        className={clsx('filter-bar-button', styles.openButton)}
-        {...getToggleButtonProps()}
-        aria-label="toggle menu"
-      >
-        <AppIcon icon={isOpen ? moveUpIcon : moveDownIcon} />
-      </button>
+          <motion.button
+            layout
+            key="menu"
+            type="button"
+            className={clsx('filter-bar-button', styles.openButton)}
+            {...getToggleButtonProps()}
+            aria-label="toggle menu"
+          >
+            <AppIcon icon={isOpen ? moveUpIcon : moveDownIcon} />
+          </motion.button>
+        </AnimatePresence>
+      </AnimateSharedLayout>
 
       {filterHelpOpen &&
         ReactDOM.createPortal(

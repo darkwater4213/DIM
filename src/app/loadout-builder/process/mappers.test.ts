@@ -1,6 +1,6 @@
+import { UpgradeSpendTier } from '@destinyitemmanager/dim-api-types';
 import { D2ManifestDefinitions } from 'app/destiny2/d2-definitions';
 import { DimItem, PluggableInventoryItemDefinition } from 'app/inventory/item-types';
-import { UpgradeSpendTier } from 'app/settings/initial-settings';
 import { DestinyEnergyType } from 'bungie-api-ts/destiny2';
 import 'cross-fetch/polyfill';
 import { getTestDefinitions, getTestStores } from '../../../testing/test-utils';
@@ -40,6 +40,7 @@ describe('lo process mappers', () => {
       defs,
       modifiedItem,
       UpgradeSpendTier.AscendantShards,
+      false,
       [perpetuationMod]
     );
 
@@ -56,10 +57,27 @@ describe('lo process mappers', () => {
       defs,
       modifiedItem,
       UpgradeSpendTier.AscendantShards,
+      false,
       []
     );
 
     expect(mappedItem.energy?.type).toBe(DestinyEnergyType.Any);
+  });
+
+  test('mapped energy is the items when no slot specific mods, a high enough spend tier, and lockItemEnergyType is true', () => {
+    const modifiedItem: DimItem = {
+      ...classItem,
+      energy: { ...classItem.energy!, energyType: DestinyEnergyType.Arc },
+    };
+    const mappedItem = mapDimItemToProcessItem(
+      defs,
+      modifiedItem,
+      UpgradeSpendTier.AscendantShards,
+      true,
+      []
+    );
+
+    expect(mappedItem.energy?.type).toBe(DestinyEnergyType.Arc);
   });
 
   test('mapped energy is Any when any slot specific mod and a high enough spend tier', () => {
@@ -71,6 +89,7 @@ describe('lo process mappers', () => {
       defs,
       modifiedItem,
       UpgradeSpendTier.AscendantShards,
+      false,
       [distributionMod]
     );
 
@@ -82,7 +101,13 @@ describe('lo process mappers', () => {
       ...classItem,
       energy: { ...classItem.energy!, energyType: DestinyEnergyType.Arc },
     };
-    const mappedItem = mapDimItemToProcessItem(defs, modifiedItem, UpgradeSpendTier.Nothing, []);
+    const mappedItem = mapDimItemToProcessItem(
+      defs,
+      modifiedItem,
+      UpgradeSpendTier.Nothing,
+      false,
+      []
+    );
 
     expect(mappedItem.energy?.type).toBe(DestinyEnergyType.Arc);
   });
@@ -93,7 +118,13 @@ describe('lo process mappers', () => {
       ...classItem,
       energy: { ...classItem.energy!, energyCapacity },
     };
-    const mappedItem = mapDimItemToProcessItem(defs, modifiedItem, UpgradeSpendTier.Nothing, []);
+    const mappedItem = mapDimItemToProcessItem(
+      defs,
+      modifiedItem,
+      UpgradeSpendTier.Nothing,
+      false,
+      []
+    );
 
     expect(mappedItem.energy?.capacity).toBe(energyCapacity);
   });
@@ -108,6 +139,7 @@ describe('lo process mappers', () => {
       defs,
       modifiedItem,
       UpgradeSpendTier.EnhancementPrisms,
+      false,
       []
     );
 
@@ -128,6 +160,7 @@ describe('lo process mappers', () => {
       defs,
       classItem,
       UpgradeSpendTier.EnhancementPrisms,
+      false,
       mods
     );
 

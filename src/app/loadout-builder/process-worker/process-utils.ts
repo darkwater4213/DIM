@@ -30,9 +30,7 @@ export function sortProcessModsOrItems(a: SortParam, b: SortParam) {
   return -1;
 }
 
-const noModsPermutations = [[null, null, null, null, null]];
-
-function stringifyModPermutation(perm: (ProcessMod | null)[]) {
+export function stringifyModPermutation(perm: (ProcessMod | null)[]) {
   let permString = '';
   for (const modOrNull of perm) {
     if (modOrNull) {
@@ -41,53 +39,6 @@ function stringifyModPermutation(perm: (ProcessMod | null)[]) {
     permString += ',';
   }
   return permString;
-}
-
-/**
- * This is heaps algorithm implemented for generating mod permutations.
- * https://en.wikipedia.org/wiki/Heap%27s_algorithm
- *
- * Note that we ensure the array length is always 5 so mods are aligned
- * with the 5 items.
- */
-export function generateModPermutations(mods: ProcessMod[]): (ProcessMod | null)[][] {
-  if (!mods.length) {
-    return noModsPermutations;
-  }
-  const cursorArray = [0, 0, 0, 0, 0];
-  const modsCopy: (ProcessMod | null)[] = Array.from(mods).sort(sortProcessModsOrItems);
-  const containsSet = new Set<string>();
-
-  while (modsCopy.length < 5) {
-    modsCopy.push(null);
-  }
-
-  let i = 0;
-
-  const rtn = [Array.from(modsCopy)];
-  containsSet.add(stringifyModPermutation(modsCopy));
-
-  while (i < 5) {
-    if (cursorArray[i] < i) {
-      if (i % 2 === 0) {
-        [modsCopy[0], modsCopy[i]] = [modsCopy[i], modsCopy[0]];
-      } else {
-        [modsCopy[cursorArray[i]], modsCopy[i]] = [modsCopy[i], modsCopy[cursorArray[i]]];
-      }
-      const uniqueConstraint = stringifyModPermutation(modsCopy);
-      if (!containsSet.has(uniqueConstraint)) {
-        rtn.push(Array.from(modsCopy));
-        containsSet.add(uniqueConstraint);
-      }
-      cursorArray[i] += 1;
-      i = 0;
-    } else {
-      cursorArray[i] = 0;
-      i += 1;
-    }
-  }
-
-  return rtn;
 }
 
 function getEnergyCounts(modsOrItems: (ProcessMod | null | ProcessItemSubset)[]) {
@@ -124,24 +75,23 @@ const defaultModEnergy = { val: 0, type: DestinyEnergyType.Any };
 /**
  * This figures out if all general, other and raid mods can be assigned to an armour set.
  *
- * The params generalModPermutations, otherModPermutations, raidModPermutations are assumed to be the results
+ * The params generalModPermutations, combatModPermutations, raidModPermutations are assumed to be the results
  * from processUtils.ts#generateModPermutations, i.e. all permutations of general, other or raid mods.
  *
  * assignments is mutated by this function to store any mods assignments that were made.
  */
 export function canTakeSlotIndependantMods(
   generalModPermutations: (ProcessMod | null)[][],
-  otherModPermutations: (ProcessMod | null)[][],
+  combatModPermutations: (ProcessMod | null)[][],
   raidModPermutations: (ProcessMod | null)[][],
-  items: ProcessItem[],
-  assignments?: Record<string, number[]>
+  items: ProcessItem[]
 ) {
   // Sort the items like the mods are to try and get a greedy result
   const sortedItems = Array.from(items).sort(sortProcessModsOrItems);
 
   const [arcItems, solarItems, voidItems, anyItems] = getEnergyCounts(sortedItems);
   const [arcSeasonalMods, solarSeasonalMods, voidSeasonalMods] = getEnergyCounts(
-    otherModPermutations[0]
+    combatModPermutations[0]
   );
   const [arcGeneralMods, solarGeneralMods, voidGeneralMods] = getEnergyCounts(
     generalModPermutations[0]
@@ -163,117 +113,98 @@ export function canTakeSlotIndependantMods(
     return false;
   }
 
-  otherModLoop: for (const otherP of otherModPermutations) {
-    otherItemLoop: for (let i = 0; i < sortedItems.length; i++) {
-      const otherMod = otherP[i];
+  raidModLoop: for (const raidPermutation of raidModPermutations) {
+    raidItemLoop: for (let i = 0; i < sortedItems.length; i++) {
+      const raidMod = raidPermutation[i];
 
       // If a mod is null there is nothing being socketed into the item so move on
-      if (!otherMod) {
-        continue otherItemLoop;
+      if (!raidMod) {
+        continue raidItemLoop;
       }
 
       const item = sortedItems[i];
-      const tag = otherMod.tag!;
-      const otherEnergy = otherMod.energy || defaultModEnergy;
+      const tag = raidMod.tag!;
+      const raidEnergy = raidMod.energy || defaultModEnergy;
 
-      const otherEnergyIsValid =
+      const raidEnergyIsValid =
         item.energy &&
-        item.energy.val + otherEnergy.val <= item.energy.capacity &&
-        (item.energy.type === otherEnergy.type ||
-          otherEnergy.type === DestinyEnergyType.Any ||
+        item.energy.val + raidEnergy.val <= item.energy.capacity &&
+        (item.energy.type === raidEnergy.type ||
+          raidEnergy.type === DestinyEnergyType.Any ||
           item.energy.type === DestinyEnergyType.Any);
 
-      // The other mods wont fit in the item set so move on to the next set of mods
-      if (!(otherEnergyIsValid && item.compatibleModSeasons?.includes(tag))) {
-        continue otherModLoop;
+      // The raid mods wont fit in the item set so move on to the next set of mods
+      if (!raidEnergyIsValid || !item.compatibleModSeasons?.includes(tag)) {
+        continue raidModLoop;
       }
     }
 
-    generalModLoop: for (const generalP of generalModPermutations) {
-      generalItemLoop: for (let i = 0; i < sortedItems.length; i++) {
-        const generalMod = generalP[i];
+    combatModLoop: for (const combatPermutation of combatModPermutations) {
+      combatItemLoop: for (let i = 0; i < sortedItems.length; i++) {
+        const combatMod = combatPermutation[i];
 
         // If a mod is null there is nothing being socketed into the item so move on
-        if (!generalMod) {
-          continue generalItemLoop;
+        if (!combatMod) {
+          continue combatItemLoop;
         }
 
         const item = sortedItems[i];
-        const generalEnergy = generalMod.energy || defaultModEnergy;
-        const otherEnergy = otherP[i]?.energy || defaultModEnergy;
+        const combatEnergy = combatMod.energy || defaultModEnergy;
+        const tag = combatMod.tag!;
+        const raidEnergy = raidPermutation[i]?.energy || defaultModEnergy;
 
-        const generalEnergyIsValid =
+        const combatEnergyIsValid =
           item.energy &&
-          item.energy.val + generalEnergy.val + otherEnergy.val <= item.energy.capacity &&
-          (item.energy.type === generalEnergy.type ||
-            generalEnergy.type === DestinyEnergyType.Any ||
-            item.energy.type === DestinyEnergyType.Any);
+          item.energy.val + combatEnergy.val + raidEnergy.val <= item.energy.capacity &&
+          (item.energy.type === combatEnergy.type ||
+            combatEnergy.type === DestinyEnergyType.Any ||
+            item.energy.type === DestinyEnergyType.Any) &&
+          (raidEnergy.type === combatEnergy.type ||
+            combatEnergy.type === DestinyEnergyType.Any ||
+            raidEnergy.type === DestinyEnergyType.Any);
 
-        // The general mods wont fit in the item set so move on to the next set of mods
-        if (!generalEnergyIsValid) {
-          continue generalModLoop;
+        // The combat mods wont fit in the item set so move on to the next set of mods
+        if (!combatEnergyIsValid || !item.compatibleModSeasons?.includes(tag)) {
+          continue combatModLoop;
         }
       }
 
-      raidModLoop: for (const raidP of raidModPermutations) {
-        raidItemLoop: for (let i = 0; i < sortedItems.length; i++) {
-          const raidMod = raidP[i];
+      generalModLoop: for (const generalModPermutation of generalModPermutations) {
+        generalItemLoop: for (let i = 0; i < sortedItems.length; i++) {
+          const generalMod = generalModPermutation[i];
 
           // If a mod is null there is nothing being socketed into the item so move on
-          if (!raidMod) {
-            continue raidItemLoop;
+          if (!generalMod) {
+            continue generalItemLoop;
           }
 
           const item = sortedItems[i];
-          const raidTag = raidMod.tag!;
-          const generalEnergy = generalP[i]?.energy || defaultModEnergy;
-          const otherEnergy = otherP[i]?.energy || defaultModEnergy;
-          const raidEnergy = raidMod.energy || defaultModEnergy;
+          const generalEnergy = generalMod.energy || defaultModEnergy;
+          const combatEnergy = combatPermutation[i]?.energy || defaultModEnergy;
+          const raidEnergy = raidPermutation[i]?.energy || defaultModEnergy;
 
-          const raidEnergyIsValid =
+          const generalEnergyIsValid =
             item.energy &&
-            item.energy.val + generalEnergy.val + otherEnergy.val + raidEnergy.val <=
+            item.energy.val + generalEnergy.val + combatEnergy.val + raidEnergy.val <=
               item.energy.capacity &&
-            (item.energy.type === raidEnergy.type ||
-              raidEnergy.type === DestinyEnergyType.Any ||
-              item.energy.type === DestinyEnergyType.Any);
+            (item.energy.type === generalEnergy.type ||
+              generalEnergy.type === DestinyEnergyType.Any ||
+              item.energy.type === DestinyEnergyType.Any) &&
+            (combatEnergy.type === generalEnergy.type ||
+              generalEnergy.type === DestinyEnergyType.Any ||
+              combatEnergy.type === DestinyEnergyType.Any) &&
+            (raidEnergy.type === generalEnergy.type ||
+              generalEnergy.type === DestinyEnergyType.Any ||
+              raidEnergy.type === DestinyEnergyType.Any);
 
-          // Due to raid mods overlapping with legacy mods for last wish we need to ensure
-          // that if an item has a legacy mod socket then another mod is not already intended
-          // for this socket.
-          const notLegacySocketOrLegacyMod = !item.hasLegacyModSocket || !otherP[i];
-
-          // The raid mods wont fit in the item set so move on to the next set of mods
-          if (
-            !(
-              raidEnergyIsValid &&
-              notLegacySocketOrLegacyMod &&
-              item.compatibleModSeasons?.includes(raidTag)
-            )
-          ) {
-            continue raidModLoop;
+          // The general mods wont fit in the item set so move on to the next set of mods
+          if (!generalEnergyIsValid) {
+            continue generalModLoop;
           }
         }
 
-        // At this point all three assignments have been satisfied, so we can create the assignments
-        // if necessary and break out of the function
-        if (assignments) {
-          for (let i = 0; i < sortedItems.length; i++) {
-            const generalMod = generalP[i];
-            const otherMod = otherP[i];
-            const raidMod = raidP[i];
-            if (generalMod) {
-              assignments[sortedItems[i].id].push(generalMod.hash);
-            }
-            if (otherMod) {
-              assignments[sortedItems[i].id].push(otherMod.hash);
-            }
-            if (raidMod) {
-              assignments[sortedItems[i].id].push(raidMod.hash);
-            }
-          }
-        }
-
+        // To hit this point we need to have found a valid set of raid mods
+        // if none is found the continue's will skip this.
         return true;
       }
     }

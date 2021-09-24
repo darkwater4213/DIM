@@ -1,68 +1,11 @@
+import { UpgradeSpendTier } from '@destinyitemmanager/dim-api-types';
 import { D2ManifestDefinitions } from 'app/destiny2/d2-definitions';
 import { DimItem } from 'app/inventory/item-types';
 import { energyUpgrade } from 'app/inventory/store/energy';
 import { UpgradeMaterialHashes } from 'app/search/d2-known-values';
-import { warnLog } from 'app/utils/log';
 import { DestinyEnergyType, DestinyInventoryItemDefinition } from 'bungie-api-ts/destiny2';
 import _ from 'lodash';
 import { ProcessItem } from './process-worker/types';
-import { LockedItemType } from './types';
-
-// Todo(ryan): Temporary until api types are available
-// this is a copy of the initial settings one as we can't have a link
-// between the web worker for process and initial settings.
-export enum UpgradeSpendTier {
-  Nothing,
-  LegendaryShards,
-  EnhancementPrisms,
-  AscendantShardsNotExotic,
-  AscendantShards,
-  AscendantShardsNotMasterworked,
-  AscendantShardsLockEnergyType,
-}
-
-/**
- * Add a locked item to the locked item list for a bucket.
- */
-export function addLockedItem(
-  lockedItem: LockedItemType,
-  locked: readonly LockedItemType[] = []
-): readonly LockedItemType[] | undefined {
-  // Locking an item clears out the other locked properties in that bucket
-  if (lockedItem.type === 'item') {
-    return [lockedItem];
-  }
-
-  // Only add if it's not already there.
-  if (!locked.some((existing) => lockedItemsEqual(existing, lockedItem))) {
-    const newLockedItems = Array.from(locked);
-    newLockedItems.push(lockedItem);
-    return newLockedItems;
-  }
-
-  return locked.length === 0 ? undefined : locked;
-}
-
-/**
- * Remove a locked item from the locked item list for a bucket.
- */
-export function removeLockedItem(
-  lockedItem: LockedItemType,
-  locked: readonly LockedItemType[] = []
-): readonly LockedItemType[] | undefined {
-  // Filter anything equal to the passed in item
-  const newLockedItems = locked.filter((existing) => !lockedItemsEqual(existing, lockedItem));
-  return newLockedItems.length === 0 ? undefined : newLockedItems;
-}
-
-export function lockedItemsEqual(first: LockedItemType, second: LockedItemType) {
-  switch (first.type) {
-    case 'item':
-      return second.type === 'item' && first.item.id === second.item.id;
-    case 'exclude':
-      return second.type === 'exclude' && first.item.id === second.item.id;
-  }
-}
 
 /** Gets the stat tier from a stat value. */
 export function statTier(stat: number) {
@@ -98,11 +41,11 @@ export function getPower(items: DimItem[] | ProcessItem[]) {
  * of the next tier up, so we can figure out what the maximum possible upgrade is.
  */
 function getEnergySpendTierBoundaryHash(item: DimItem, tier: UpgradeSpendTier) {
-  const isExotic = Boolean(item.equippingLabel);
   // Used for figuring out what upgrade is not allowed
   let boundaryHash: number | 'none' = 'none';
 
   switch (tier) {
+    case UpgradeSpendTier.AscendantShardsLockEnergyType:
     case UpgradeSpendTier.Nothing:
       throw new Error('Please handle this as a special case, no upgrades are allowed.');
     case UpgradeSpendTier.LegendaryShards:
@@ -112,7 +55,7 @@ function getEnergySpendTierBoundaryHash(item: DimItem, tier: UpgradeSpendTier) {
       boundaryHash = UpgradeMaterialHashes.ascendantShard;
       break;
     case UpgradeSpendTier.AscendantShardsNotExotic: {
-      if (!isExotic) {
+      if (!item.isExotic) {
         break;
       }
       // for exotics we allow energy upgrades/swaps using enhancement prisms.
@@ -125,7 +68,6 @@ function getEnergySpendTierBoundaryHash(item: DimItem, tier: UpgradeSpendTier) {
       boundaryHash =
         item.energy?.energyCapacity === 10 ? UpgradeMaterialHashes.ascendantShard : 'none';
       break;
-    case UpgradeSpendTier.AscendantShardsLockEnergyType:
     case UpgradeSpendTier.AscendantShards:
       break;
   }
@@ -195,9 +137,11 @@ export function upgradeSpendTierToMaxEnergy(
 export function canSwapEnergyFromUpgradeSpendTier(
   defs: D2ManifestDefinitions,
   tier: UpgradeSpendTier,
-  item: DimItem
+  item: DimItem,
+  lockItemEnergyType: boolean
 ) {
   if (
+    lockItemEnergyType ||
     !item.energy ||
     tier === UpgradeSpendTier.Nothing ||
     tier === UpgradeSpendTier.AscendantShardsLockEnergyType
@@ -205,29 +149,12 @@ export function canSwapEnergyFromUpgradeSpendTier(
     return false;
   }
 
-  let differentEnergy: DestinyEnergyType;
-
-  // Find any armour energy that is not the current energy
-  switch (item.energy.energyType) {
-    case DestinyEnergyType.Arc:
-      differentEnergy = DestinyEnergyType.Thermal;
-      break;
-    case DestinyEnergyType.Thermal:
-      differentEnergy = DestinyEnergyType.Void;
-      break;
-    case DestinyEnergyType.Void:
-      differentEnergy = DestinyEnergyType.Arc;
-      break;
-    default: {
-      warnLog(
-        'loadout-builder',
-        `Armor expected to have an energy type of ${DestinyEnergyType.Arc},
-        ${DestinyEnergyType.Thermal} or ${DestinyEnergyType.Void} but had
-        ${item.energy.energyType}`
-      );
-      differentEnergy = item.energy.energyType;
-    }
-  }
+  // Find any armour energy that is not the current energy, just so we correctly
+  // calculate the cost of a switch.
+  const differentEnergy =
+    item.energy.energyType === DestinyEnergyType.Arc
+      ? DestinyEnergyType.Thermal
+      : DestinyEnergyType.Arc;
 
   // gets a single upgrade for swapping energy at the current level
   const availableEnergyUpgrades = energyUpgrade(

@@ -1,11 +1,16 @@
 import { settingsSelector } from 'app/dim-api/selectors';
-import { itemPop } from 'app/dim-ui/scroll';
+import BungieImage from 'app/dim-ui/BungieImage';
 import { t } from 'app/i18next-t';
+import { locateItem } from 'app/inventory/locate-item';
+import { statLabels } from 'app/organizer/Columns';
 import { setSettingAction } from 'app/settings/actions';
 import Checkbox from 'app/settings/Checkbox';
 import { Settings } from 'app/settings/initial-settings';
+import { acquisitionRecencyComparator } from 'app/shell/filters';
 import { AppIcon, faAngleLeft, faAngleRight, faList } from 'app/shell/icons';
+import { isPhonePortraitSelector } from 'app/shell/selectors';
 import { RootState, ThunkDispatchProp } from 'app/store/types';
+import { isiOSBrowser } from 'app/utils/browsers';
 import { emptyArray } from 'app/utils/empty';
 import { getSocketByIndex } from 'app/utils/socket-utils';
 import { DestinyDisplayPropertiesDefinition } from 'bungie-api-ts/destiny2';
@@ -20,6 +25,7 @@ import Sheet from '../dim-ui/Sheet';
 import { DimItem, DimPlug, DimSocket, DimStat } from '../inventory/item-types';
 import { chainComparator, compareBy, reverseComparator } from '../utils/comparators';
 import { endCompareSession, removeCompareItem, updateCompareQuery } from './actions';
+import styles from './Compare.m.scss';
 import './compare.scss';
 import CompareItem from './CompareItem';
 import CompareSuggestions from './CompareSuggestions';
@@ -40,6 +46,7 @@ interface StoreProps {
   session?: CompareSession;
   compareBaseStats: boolean;
   organizerLink?: string;
+  isPhonePortrait: boolean;
 }
 
 type Props = StoreProps & ThunkDispatchProp;
@@ -51,6 +58,7 @@ function mapStateToProps(state: RootState): StoreProps {
     compareItems: compareItemsSelector(state),
     session: compareSessionSelector(state),
     organizerLink: compareOrganizerLinkSelector(state),
+    isPhonePortrait: isPhonePortraitSelector(state),
   };
 }
 
@@ -65,15 +73,20 @@ export interface StatInfo {
 }
 
 /** a DimStat with, at minimum, a statHash */
-export type MinimalStat = Partial<DimStat> & Pick<DimStat, 'statHash'>;
+export type MinimalStat = { statHash: number; value: number; base?: number };
 type StatGetter = (item: DimItem) => undefined | MinimalStat;
 
 // TODO: Allow minimizing the sheet (to make selection easier)
 // TODO: memoize
-function Compare(
-  this: void,
-  { categoryItems, compareBaseStats, compareItems, session, organizerLink, dispatch }: Props
-) {
+function Compare({
+  categoryItems,
+  compareBaseStats,
+  compareItems,
+  session,
+  organizerLink,
+  isPhonePortrait,
+  dispatch,
+}: Props) {
   /** The stat row to highlight */
   const [highlight, setHighlight] = useState<string | number>();
   /** The stat row to sort by */
@@ -92,10 +105,14 @@ function Compare(
     dispatch(endCompareSession());
   }, [dispatch]);
 
-  const show = Boolean(session) && compareItems.length > 0;
-  const destinyVersion = show ? compareItems[0].destinyVersion : 2;
+  const hasSession = Boolean(session);
+  const hasItems = compareItems.length > 0;
+  const show = hasSession && hasItems;
+
+  const firstCompareItem = compareItems.length > 0 ? compareItems[0] : undefined;
+  const destinyVersion = show ? firstCompareItem?.destinyVersion : 2;
   useEffect(() => {
-    if (show) {
+    if (show && destinyVersion !== undefined) {
       ga('send', 'pageview', `/profileMembershipId/d${destinyVersion}/compare`);
     }
   }, [show, destinyVersion]);
@@ -109,10 +126,17 @@ function Compare(
   // Clear the session on unmount
   useEffect(
     () => () => {
-      dispatch(endCompareSession());
+      cancel();
     },
-    [dispatch]
+    [cancel]
   );
+
+  // Reset if there ever are no items
+  useEffect(() => {
+    if (hasSession && !hasItems) {
+      cancel();
+    }
+  }, [cancel, hasItems, hasSession]);
 
   // TODO: make a function that takes items and perk overrides and produces new items!
 
@@ -122,29 +146,50 @@ function Compare(
     [compareItems, compareBaseStats, adjustedStats]
   );
 
-  const comparingArmor = compareItems[0]?.bucket.inArmor;
+  const comparingArmor = firstCompareItem?.bucket.inArmor;
   const doCompareBaseStats = Boolean(compareBaseStats && comparingArmor);
 
-  if (!show) {
-    return null;
-  }
+  const updateQuery = useCallback(
+    (newQuery: string) => {
+      dispatch(updateCompareQuery(newQuery));
+    },
+    [dispatch]
+  );
 
-  const updateQuery = (newQuery: string) => {
-    dispatch(updateCompareQuery(newQuery));
-  };
+  const doUpdateSocketComparePlug = useCallback(
+    ({ item, socket, plug }: { item: DimItem; socket: DimSocket; plug: DimPlug }) => {
+      const updatedPlugs = updateSocketComparePlug({
+        item,
+        socket,
+        plug,
+        adjustedPlugs,
+        adjustedStats,
+      });
+      if (!updatedPlugs) {
+        return;
+      }
+      // TODO: put these together
+      setAdjustedPlugs(updatedPlugs.adjustedPlugs);
+      setAdjustedStats(updatedPlugs.adjustedStats);
+    },
+    [adjustedPlugs, adjustedStats]
+  );
 
-  const sort = (newSortedHash?: string | number) => {
+  const remove = useCallback(
+    (item: DimItem) => {
+      if (compareItems.length <= 1) {
+        cancel();
+      } else {
+        dispatch(removeCompareItem(item));
+      }
+    },
+    [cancel, compareItems.length, dispatch]
+  );
+
+  const changeSort = (newSortedHash?: string | number) => {
     // TODO: put sorting together?
     setSortedHash(newSortedHash);
     setSortBetterFirst(sortedHash === newSortedHash ? !sortBetterFirst : true);
-  };
-
-  const remove = (item: DimItem) => {
-    if (compareItems.length <= 1) {
-      cancel();
-    } else {
-      dispatch(removeCompareItem(item));
-    }
   };
 
   const onChangeSetting = (checked: boolean, name: keyof Settings) => {
@@ -158,109 +203,110 @@ function Compare(
     allStats
   );
   const sortedComparisonItems = !sortedHash
-    ? compareItems
+    ? Array.from(compareItems).sort(acquisitionRecencyComparator)
     : Array.from(compareItems).sort(comparator);
 
-  const doUpdateSocketComparePlug = ({
-    item,
-    socket,
-    plug,
-  }: {
-    item: DimItem;
-    socket: DimSocket;
-    plug: DimPlug;
-  }) => {
-    const updatedPlugs = updateSocketComparePlug({
-      item,
-      socket,
-      plug,
+  const items = useMemo(
+    () => (
+      <div className={styles.items}>
+        {sortedComparisonItems.map((item) => (
+          <CompareItem
+            item={item}
+            key={item.id}
+            stats={allStats}
+            itemClick={locateItem}
+            remove={remove}
+            setHighlight={setHighlight}
+            updateSocketComparePlug={doUpdateSocketComparePlug}
+            adjustedItemPlugs={adjustedPlugs?.[item.id]}
+            adjustedItemStats={adjustedStats?.[item.id]}
+            compareBaseStats={doCompareBaseStats}
+            isInitialItem={session?.initialItemId === item.id}
+          />
+        ))}
+      </div>
+    ),
+    [
       adjustedPlugs,
       adjustedStats,
-    });
-    if (!updatedPlugs) {
-      return;
-    }
-    // TODO: put these together
-    setAdjustedPlugs(updatedPlugs.adjustedPlugs);
-    setAdjustedStats(updatedPlugs.adjustedStats);
-  };
+      allStats,
+      doCompareBaseStats,
+      doUpdateSocketComparePlug,
+      remove,
+      session?.initialItemId,
+      sortedComparisonItems,
+    ]
+  );
 
-  // TODO: test/handle removing all items (no results)
+  if (!show) {
+    return null;
+  }
 
   // If the session was started with a specific item, this is it
-  // TODO: highlight this item
-  const initialItem =
-    session?.initialItemId && categoryItems.find((i) => i.id === session.initialItemId);
+  const initialItem = session?.initialItemId
+    ? categoryItems.find((i) => i.id === session.initialItemId)
+    : undefined;
   // The example item is the one we'll use for generating suggestion buttons
-  const exampleItem = initialItem || compareItems[0];
+  const exampleItem = initialItem || firstCompareItem;
+
+  const header = (
+    <div className={styles.options}>
+      {comparingArmor && (
+        <Checkbox
+          label={t('Compare.CompareBaseStats')}
+          name="compareBaseStats"
+          value={compareBaseStats}
+          onChange={onChangeSetting}
+        />
+      )}
+      {exampleItem && (
+        <CompareSuggestions
+          exampleItem={exampleItem}
+          categoryItems={categoryItems}
+          onQueryChanged={updateQuery}
+        />
+      )}
+      {organizerLink && (
+        <Link className={styles.organizerLink} to={organizerLink}>
+          <AppIcon icon={faList} />
+          <span>{t('Organizer.OpenIn')}</span>
+        </Link>
+      )}
+    </div>
+  );
 
   return (
-    <Sheet
-      onClose={cancel}
-      header={
-        <div className="compare-options">
-          {comparingArmor && (
-            <Checkbox
-              label={t('Compare.CompareBaseStats')}
-              name="compareBaseStats"
-              value={compareBaseStats}
-              onChange={onChangeSetting}
-            />
-          )}
-          {exampleItem && (
-            <CompareSuggestions
-              exampleItem={exampleItem}
-              categoryItems={categoryItems}
-              onQueryChanged={updateQuery}
-            />
-          )}
-          {organizerLink && (
-            <Link className="dim-button organizer-link" to={organizerLink}>
-              <AppIcon icon={faList} /> {t('Organizer.OpenIn')}
-            </Link>
-          )}
-        </div>
-      }
-    >
-      <div id="loadout-drawer" className="compare">
-        <div className="compare-bucket" onMouseLeave={() => setHighlight(undefined)}>
-          <div className="compare-item fixed-left">
-            <div className="spacer" />
+    <Sheet onClose={cancel} allowClickThrough={true} header={header}>
+      <div className="loadout-drawer compare">
+        <div className={styles.bucket} onMouseLeave={() => setHighlight(undefined)}>
+          <div className={clsx('compare-item', styles.fixedLeft)}>
+            <div className={styles.spacer} />
             {allStats.map((stat) => (
               <div
                 key={stat.id}
-                className={clsx('compare-stat-label', {
-                  highlight: stat.id === highlight,
-                  sorted: stat.id === sortedHash,
+                className={clsx(styles.statLabel, {
+                  [styles.sorted]: stat.id === sortedHash,
                 })}
                 onMouseOver={() => setHighlight(stat.id)}
-                onClick={() => sort(stat.id)}
+                onClick={() => changeSort(stat.id)}
               >
-                {stat.displayProperties.name}{' '}
+                {stat.displayProperties.hasIcon && (
+                  <span title={stat.displayProperties.name}>
+                    <BungieImage src={stat.displayProperties.icon} />
+                  </span>
+                )}
+                {stat.id in statLabels ? t(statLabels[stat.id]) : stat.displayProperties.name}{' '}
                 {stat.id === sortedHash && (
                   <AppIcon icon={sortBetterFirst ? faAngleRight : faAngleLeft} />
                 )}
+                {stat.id === highlight && <div className={styles.highlightBar} />}
               </div>
             ))}
+            {isPhonePortrait && isiOSBrowser() && (
+              <div className={styles.swipeAdvice}>{t('Compare.SwipeAdvice')}</div>
+            )}
           </div>
-          <div className="compare-items">
-            {sortedComparisonItems.map((item) => (
-              <CompareItem
-                item={item}
-                key={item.id}
-                stats={allStats}
-                itemClick={itemPop}
-                remove={remove}
-                setHighlight={setHighlight}
-                highlight={highlight}
-                updateSocketComparePlug={doUpdateSocketComparePlug}
-                adjustedItemPlugs={adjustedPlugs?.[item.id]}
-                adjustedItemStats={adjustedStats?.[item.id]}
-                compareBaseStats={doCompareBaseStats}
-                isInitialItem={session?.initialItemId === item.id}
-              />
-            ))}
-          </div>
+          {items}
         </div>
       </div>
     </Sheet>
@@ -279,23 +325,20 @@ function sortCompareItemsComparator(
     return (_a: DimItem, _b: DimItem) => 0;
   }
 
-  return reverseComparator(
-    chainComparator(
-      compareBy((item: DimItem) => {
-        const shouldReverse = sortStat.lowerBetter ? sortBetterFirst : !sortBetterFirst;
+  const shouldReverse = sortStat.lowerBetter ? sortBetterFirst : !sortBetterFirst;
 
+  return reverseComparator(
+    chainComparator<DimItem>(
+      compareBy((item) => {
         const stat = sortStat.getStat(item);
         if (!stat) {
           return -1;
         }
-        const statValue = compareBaseStats ? stat.base : stat.value;
-        if (statValue === undefined) {
-          return -1;
-        }
+        const statValue = compareBaseStats ? stat.base ?? stat.value : stat.value;
         return shouldReverse ? -statValue : statValue;
       }),
-      compareBy((i: DimItem) => i.index),
-      compareBy((i: DimItem) => i.name)
+      compareBy((i) => i.index),
+      compareBy((i) => i.name)
     )
   );
 }
@@ -332,7 +375,6 @@ function updateSocketComparePlug({
     item.destinyVersion === 1 ||
     !item.sockets ||
     !item.stats ||
-    socketIndex > 2 ||
     !pluggedPlug ||
     (clickedPlug.plugDef.hash === pluggedPlug?.plugDef.hash && currentAdjustedPlug === undefined)
   ) {
@@ -481,7 +523,6 @@ function getAllStats(
           (item.energy && {
             statHash: item.energy.energyType,
             value: item.energy.energyCapacity,
-            base: undefined,
           }) ||
           undefined
       )
@@ -561,7 +602,7 @@ function makeFakeStat(
   displayProperties: DestinyDisplayPropertiesDefinition | string,
   getStat: StatGetter,
   lowerBetter = false
-) {
+): StatInfo {
   if (typeof displayProperties === 'string') {
     displayProperties = { name: displayProperties } as DestinyDisplayPropertiesDefinition;
   }

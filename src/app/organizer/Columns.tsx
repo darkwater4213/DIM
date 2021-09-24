@@ -7,7 +7,7 @@ import ElementIcon from 'app/dim-ui/ElementIcon';
 import { KillTrackerInfo } from 'app/dim-ui/KillTracker';
 import PressTip from 'app/dim-ui/PressTip';
 import { SpecialtyModSlotIcon } from 'app/dim-ui/SpecialtyModSlotIcon';
-import { t } from 'app/i18next-t';
+import { t, tl } from 'app/i18next-t';
 import { getNotes, getTag, ItemInfos, tagConfig } from 'app/inventory/dim-item-info';
 import { D1Item, DimItem } from 'app/inventory/item-types';
 import ItemIcon, { DefItemIcon } from 'app/inventory/ItemIcon';
@@ -37,11 +37,11 @@ import {
 import { RootState } from 'app/store/types';
 import { compareBy } from 'app/utils/comparators';
 import {
+  getInterestingSocketMetadatas,
   getItemDamageShortName,
   getItemKillTrackerInfo,
   getItemYear,
   getMasterworkStatNames,
-  getSpecialtySocketMetadatas,
   isD1Item,
   isSunset,
 } from 'app/utils/item-utils';
@@ -70,6 +70,17 @@ import { ColumnDefinition, ColumnGroup, SortDirection } from './table-types';
 export function getColumnSelectionId(column: ColumnDefinition) {
   return column.columnGroup ? column.columnGroup.id : column.id;
 }
+
+// Some stat labels are long. This lets us replace them with i18n
+export const statLabels: Record<number, string | undefined> = {
+  [StatHashes.RoundsPerMinute]: tl('Organizer.Stats.RPM'),
+  [StatHashes.ReloadSpeed]: tl('Organizer.Stats.Reload'), // Reload Speed
+  [StatHashes.AimAssistance]: tl('Organizer.Stats.Aim'), // Aim Assistance
+  [StatHashes.RecoilDirection]: tl('Organizer.Stats.Recoil'), // Recoil Direction
+  [StatHashes.InventorySize]: tl('Organizer.Stats.Inventory'), // Inventory Size
+  [StatHashes.Attack]: tl('Organizer.Stats.Power'), // Inventory Size
+  [StatHashes.Defense]: tl('Organizer.Stats.Power'), // Inventory Size
+};
 
 // const booleanCell = (value: any) => (value ? <AppIcon icon={faCheck} /> : undefined);
 
@@ -103,15 +114,6 @@ export function getColumns(
     header: t('Organizer.Columns.StatQuality'),
   };
 
-  // Some stat labels are long. This lets us replace them with i18n
-  const statLabels: Record<number, string | undefined> = {
-    [StatHashes.RoundsPerMinute]: t('Organizer.Stats.RPM'),
-    [StatHashes.ReloadSpeed]: t('Organizer.Stats.Reload'), // Reload Speed
-    [StatHashes.AimAssistance]: t('Organizer.Stats.Aim'), // Aim Assistance
-    [StatHashes.RecoilDirection]: t('Organizer.Stats.Recoil'), // Recoil Direction
-    [StatHashes.InventorySize]: t('Organizer.Stats.Inventory'), // Inventory Size
-  };
-
   type ColumnWithStat = ColumnDefinition & { statHash: number };
   const statColumns: ColumnWithStat[] = _.sortBy(
     _.compact(
@@ -121,14 +123,18 @@ export function getColumns(
           // Exclude custom total, it has its own column
           return undefined;
         }
+        const statLabel = statLabels[statHash];
+
         return {
           id: `stat${statHash}`,
           header: statInfo.displayProperties.hasIcon ? (
             <span title={statInfo.displayProperties.name}>
               <BungieImage src={statInfo.displayProperties.icon} />
             </span>
+          ) : statLabel ? (
+            t(statLabel)
           ) : (
-            statLabels[statHash] || statInfo.displayProperties.name
+            statInfo.displayProperties.name
           ),
           statHash,
           columnGroup: statsGroup,
@@ -339,15 +345,24 @@ export function getColumns(
         header: t('Organizer.Columns.ModSlot'),
         // TODO: only show if there are mod slots
         value: (item) =>
-          getSpecialtySocketMetadatas(item)
+          getInterestingSocketMetadatas(item)
             ?.map((m) => m.slotTag)
             .join(','),
         cell: (value, item) =>
-          value && <SpecialtyModSlotIcon className={styles.modslotIcon} item={item} />,
-        filter: (_val, item) => {
-          const modSlotMetadata = getSpecialtySocketMetadatas(item);
-          return `modslot:${modSlotMetadata?.[0].slotTag || 'none'}`;
-        },
+          value && (
+            <SpecialtyModSlotIcon
+              className={styles.modslotIcon}
+              item={item}
+              excludeStandardD2ModSockets
+            />
+          ),
+        filter: (value: string) =>
+          value !== undefined
+            ? value
+                .split(',')
+                .map((m) => `modslot:${m}`)
+                .join(' ')
+            : ``,
       },
     destinyVersion === 1 && {
       id: 'percentComplete',

@@ -10,52 +10,33 @@ declare const $BROWSERS: string[];
 declare const $featureFlags: {
   /** Print debug info to console about item moves */
   debugMoves: boolean;
-  /** Enable color-blind a11y */
-  colorA11y: boolean;
   /** Debug Service Worker */
   debugSW: boolean;
   /** Send exception reports to Sentry.io */
   sentry: boolean;
-  /** D2 Vendors */
-  vendors: boolean;
-  /** Respect the "do not track" header. */
-  respectDNT: boolean;
   /** Community-curated wish lists */
   wishLists: boolean;
   /** Show a banner for supporting a charitable cause */
   issueBanner: boolean;
-  /** Show confetti */
-  confetti: boolean;
   /** Show the triage tab in the item popup */
   triage: boolean;
   /** Enable new mobile inspect view when dragging an item */
   mobileInspect: boolean;
-  /** Enable move amounts */
-  moveAmounts: boolean;
   /** Enable alt inv mode */
   altInventoryMode: boolean;
-  /** Enable search results */
-  searchResults: boolean;
   /** Alternate perks display on item popup */
   newPerks: boolean;
   /** Advanced Write Actions (inserting mods) */
   awa: boolean;
-  /** Incorporate mods directly into loadouts */
-  loadoutMods: boolean;
-  /** Show bounty guide */
-  bountyGuide: boolean;
   /** Whether ability cooldowns are shown in stats tooltips */
   abilityCooldowns: boolean;
-  /** Install prompt banners for mobile */
-  installBanner: boolean;
-  /** Header banner when postmaster is full */
-  postmasterBanner: boolean;
 };
 
 declare function ga(...params: string[]);
 
 interface Window {
   OC?: unknown;
+  MSStream?: unknown;
 
   // Service worker stuff
   __precacheManifest: string[] | undefined;
@@ -66,6 +47,9 @@ interface Window {
 interface Navigator {
   /** iOS-only: True if the app is running in installed mode */
   standalone?: boolean;
+
+  setAppBadge(num?: number);
+  clearAppBadge();
 }
 
 /**
